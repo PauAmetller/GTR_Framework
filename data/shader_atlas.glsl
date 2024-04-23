@@ -119,6 +119,9 @@ in vec4 v_color;
 uniform vec4 u_color;
 uniform sampler2D u_texture_albedo;
 uniform sampler2D u_texture_emissive;
+uniform sampler2D u_texture_occlusion;
+uniform sampler2D u_texture_normalmap;
+uniform sampler2D u_texture_metallic_roughness; //Still not used
 uniform float u_time;
 uniform float u_alpha_cutoff;
 
@@ -138,6 +141,33 @@ uniform int u_light_type;
 
 out vec4 FragColor;
 
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
+{
+	// get edge vectors of the pixel triangle
+	vec3 dp1 = dFdx( p );
+	vec3 dp2 = dFdy( p );
+	vec2 duv1 = dFdx( uv );
+	vec2 duv2 = dFdy( uv );
+	
+	// solve the linear system
+	vec3 dp2perp = cross( dp2, N );
+	vec3 dp1perp = cross( N, dp1 );
+	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+ 
+	// construct a scale-invariant frame 
+	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+	return mat3( T * invmax, B * invmax, N );
+}
+
+vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
+{
+	normal_pixel = normal_pixel * 255./127. - 128./127.;
+	mat3 TBN = cotangent_frame(N, WP, uv);
+	return normalize(TBN * normal_pixel);
+}
+
+
 void main()
 {
 	vec2 uv = v_uv;
@@ -147,18 +177,16 @@ void main()
 	if(color.a < u_alpha_cutoff)
 		discard;
 
-	vec3 light = u_ambient_light;
-	
-	vec3 N = normalize( v_normal );
+	vec3 light = u_ambient_light * texture(u_texture_occlusion, v_uv).xyz;
 	
 	vec3 L;
+
+	vec3 light_add;
 	
-	float NdotL;
 	if ( u_light_type == DIRECTIONALLIGHT)
 	{
 		L = u_light_front;	
-		NdotL = clamp(dot(N,L), 0.0, 1.0);
-		light += NdotL * u_light_color;
+		light_add = u_light_color;
 	}
 	else if (u_light_type == SPOTLIGHT || u_light_type == POINTLIGHT) //spot and point
 	{
@@ -179,14 +207,18 @@ void main()
 			}
 		}
 
-		NdotL = clamp(dot(N,L), 0.0, 1.0);
-
 		float att_factor = u_light_max_distance - dist;
 		att_factor /= u_light_max_distance;
 		att_factor = max(att_factor, 0.0);
 		
-		light += (NdotL * u_light_color) * att_factor * spot_factor;
+		light_add = u_light_color * att_factor * spot_factor;
 	} 
+
+	vec3 normal = texture(u_texture_normalmap, v_uv).xyz;
+    	vec3 perturbed_normal = perturbNormal(v_normal, v_world_position, v_uv, normal);
+	float NdotL = clamp(max(dot(perturbed_normal, L), 0.0), 0.0, 1.0);
+
+	light += (NdotL * light_add);
 
 	vec4 final_color;
 	final_color.xyz = (color.xyz * light) + u_emissive_factor * texture( u_texture_emissive, v_uv ).xyz;
