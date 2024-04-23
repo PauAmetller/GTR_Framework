@@ -1,6 +1,7 @@
 //example of some shaders compiled
 flat basic.vs flat.fs
 texture basic.vs texture.fs
+light basic.vs light.fs
 skybox basic.vs skybox.fs
 depth quad.vs depth.fs
 multi basic.vs multi.fs
@@ -104,6 +105,76 @@ void main()
 
 	FragColor = color;
 }
+
+\light.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec3 v_world_position;
+in vec3 v_normal;
+in vec2 v_uv;
+in vec4 v_color;
+
+uniform vec4 u_color;
+uniform sampler2D u_texture;
+uniform float u_time;
+uniform float u_alpha_cutoff;
+
+uniform vec3 u_ambient_light;
+uniform vec3 u_light_position;
+uniform vec3 u_light_color;
+uniform vec3 u_light_front;
+uniform float u_light_max_distance;
+
+uniform int u_light_type;
+
+#define POINTLIGHT 1
+#define SPOTLIGHT 2
+#define DIRECTIONALLIGHT 3
+
+out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = v_uv;
+	vec4 color = u_color;
+	color *= texture( u_texture, v_uv );
+
+	if(color.a < u_alpha_cutoff)
+		discard;
+
+	vec3 light = u_ambient_light;
+
+	vec3 N = normalize( v_normal );
+	
+	vec3 L = u_light_position - v_world_position;
+	float dist = length(L);
+	L = L /dist;
+	
+	float NdotL;
+	if ( u_light_type == DIRECTIONALLIGHT)
+	{
+		L = u_light_front;	
+		NdotL = clamp(dot(N,L), 0.0, 1.0);
+		light += NdotL * u_light_color;
+	}
+	else if (u_light_type == SPOTLIGHT || u_light_type == POINTLIGHT) //spot and point
+	{
+		NdotL = clamp(dot(N,L), 0.0, 1.0);
+		float att_factor = u_light_max_distance - dist;
+		att_factor /= u_light_max_distance;
+		att_factor = max(att_factor, 0.0);
+		light += (NdotL * u_light_color) * att_factor;
+	}
+
+	vec4 final_color;
+	final_color.xyz = color.xyz * light;
+	final_color.a = color.a;
+	
+	FragColor = final_color;
+}
+
 
 
 \skybox.fs
