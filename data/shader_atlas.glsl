@@ -122,10 +122,12 @@ uniform float u_time;
 uniform float u_alpha_cutoff;
 
 uniform vec3 u_ambient_light;
+uniform vec3 u_emissive_factor;
 uniform vec3 u_light_position;
 uniform vec3 u_light_color;
 uniform vec3 u_light_front;
 uniform float u_light_max_distance;
+uniform vec2 u_light_cone_info;
 
 uniform int u_light_type;
 
@@ -145,12 +147,10 @@ void main()
 		discard;
 
 	vec3 light = u_ambient_light;
-
+	
 	vec3 N = normalize( v_normal );
 	
-	vec3 L = u_light_position - v_world_position;
-	float dist = length(L);
-	L = L /dist;
+	vec3 L;
 	
 	float NdotL;
 	if ( u_light_type == DIRECTIONALLIGHT)
@@ -161,15 +161,34 @@ void main()
 	}
 	else if (u_light_type == SPOTLIGHT || u_light_type == POINTLIGHT) //spot and point
 	{
+		L = u_light_position - v_world_position;
+		float dist = length(L);
+
+		float min_angle_cos = u_light_cone_info.x;
+		float max_angle_cos = u_light_cone_info.y;
+		float spot_factor = 1.0;
+		if (u_light_type == SPOTLIGHT){
+			vec3 L_norm = normalize(L);
+			vec3 D = normalize(u_light_front);
+			float cos_angle = dot( D, L_norm );
+			if( cos_angle < min_angle_cos  ){
+	 			spot_factor = 0.0;
+			} else if ( cos_angle < max_angle_cos) {
+				spot_factor *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
+			}
+		}
+
 		NdotL = clamp(dot(N,L), 0.0, 1.0);
+
 		float att_factor = u_light_max_distance - dist;
 		att_factor /= u_light_max_distance;
 		att_factor = max(att_factor, 0.0);
-		light += (NdotL * u_light_color) * att_factor;
-	}
+		
+		light += (NdotL * u_light_color) * att_factor * spot_factor;
+	} 
 
 	vec4 final_color;
-	final_color.xyz = color.xyz * light;
+	final_color.xyz = (color.xyz * light) + u_emissive_factor;
 	final_color.a = color.a;
 	
 	FragColor = final_color;

@@ -43,7 +43,6 @@ namespace SCN {
 
 		std::vector<Renderable> renderables; ///////////
 		std::vector<LightEntity*> lights; //////////
-		std::vector<LightEntity*> visible_lights;
 
 		//updated every frame
 		Renderer(const char* shaders_atlas_filename );

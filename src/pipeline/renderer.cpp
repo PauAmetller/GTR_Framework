@@ -108,7 +108,6 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 			}
 		}
 	}
-
 }
 
 ////////////////
@@ -350,8 +349,10 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	cameraToShader(camera, shader);
 	float t = getTime();
 	shader->setUniform("u_time", t);
-
+	////////////
 	shader->setUniform("u_ambient_light", scene->ambient_light);
+	shader->setUniform("u_emissive_factor", material->emissive_factor);
+	///////////
 	shader->setUniform("u_color", material->color);
 	if (texture)
 		shader->setUniform("u_texture", texture, 0);
@@ -362,6 +363,7 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	if (render_wireframe)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+	////////////
 	if (material->alpha_mode != SCN::eAlphaMode::BLEND){
 		glDisable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -375,15 +377,17 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 			mesh->render(GL_TRIANGLES);
 			glEnable(GL_BLEND);
 			shader->setUniform("u_ambient_light", vec3(0.0));
+			shader->setUniform("u_emissive_factor", vec3(0.0));
 		}
-
-		glDepthFunc(GL_LESS);
 	}
 	else {
 		shader->setUniform("u_light_type", 0);
 		mesh->render(GL_TRIANGLES);
 	}
 
+	glDepthFunc(GL_LESS);
+	//////////////
+	
 	//disable shader
 	shader->disable();
 
@@ -405,7 +409,7 @@ void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader)
 	shader->setUniform("u_light_position", light->root.global_model.getTranslation());
 	shader->setUniform("u_light_color", light->color * light->intensity);
 	shader->setUniform("u_light_max_distance", light->max_distance);
-	shader->setUniform("u_light_cone_info", light->cone_info);
+	shader->setUniform("u_light_cone_info", vec2(cos(light->cone_info.x), cos(light->cone_info.y)));
 	shader->setUniform("u_light_front", light->root.model.frontVector().normalize());
 }
 
