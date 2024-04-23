@@ -159,6 +159,8 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	for (Renderable& re : alphaRenderables) {
 		renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 	}
+	opaqueRenderables.clear();
+	alphaRenderables.clear();
 	////////////////
 }
 
@@ -305,16 +307,20 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 
 	//define locals to simplify coding
 	GFX::Shader* shader = NULL;
-	GFX::Texture* texture = NULL;
+	GFX::Texture* textureAlbedo = NULL;
+	GFX::Texture* textureEmissive = NULL;
 	Camera* camera = Camera::current;
 
-	texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+	textureAlbedo = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+	textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
 	//texture = material->emissive_texture;
 	//texture = material->metallic_roughness_texture;
 	//texture = material->normal_texture;
 	//texture = material->occlusion_texture;
-	if (texture == NULL)
-		texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+	if (textureAlbedo == NULL)
+		textureAlbedo = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+	if (textureEmissive == NULL)
+		textureEmissive = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
 	//select the blending
 	if (material->alpha_mode == SCN::eAlphaMode::BLEND)
@@ -354,8 +360,8 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	shader->setUniform("u_emissive_factor", material->emissive_factor);
 	///////////
 	shader->setUniform("u_color", material->color);
-	if (texture)
-		shader->setUniform("u_texture", texture, 0);
+	shader->setUniform("u_texture_albedo", textureAlbedo, 0);
+	shader->setUniform("u_texture_emissive", textureEmissive, 1);
 
 	//this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
 	shader->setUniform("u_alpha_cutoff", material->alpha_mode == SCN::eAlphaMode::MASK ? material->alpha_cutoff : 0.001f);
@@ -409,7 +415,7 @@ void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader)
 	shader->setUniform("u_light_position", light->root.global_model.getTranslation());
 	shader->setUniform("u_light_color", light->color * light->intensity);
 	shader->setUniform("u_light_max_distance", light->max_distance);
-	shader->setUniform("u_light_cone_info", vec2(cos(light->cone_info.x), cos(light->cone_info.y)));
+	shader->setUniform("u_light_cone_info", vec2(cos(light->cone_info.x * DEG2RAD), cos(light->cone_info.y * DEG2RAD)));
 	shader->setUniform("u_light_front", light->root.model.frontVector().normalize());
 }
 

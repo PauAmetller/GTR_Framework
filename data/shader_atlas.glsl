@@ -117,7 +117,8 @@ in vec2 v_uv;
 in vec4 v_color;
 
 uniform vec4 u_color;
-uniform sampler2D u_texture;
+uniform sampler2D u_texture_albedo;
+uniform sampler2D u_texture_emissive;
 uniform float u_time;
 uniform float u_alpha_cutoff;
 
@@ -141,7 +142,7 @@ void main()
 {
 	vec2 uv = v_uv;
 	vec4 color = u_color;
-	color *= texture( u_texture, v_uv );
+	color *= texture( u_texture_albedo, v_uv );
 
 	if(color.a < u_alpha_cutoff)
 		discard;
@@ -170,7 +171,7 @@ void main()
 		if (u_light_type == SPOTLIGHT){
 			vec3 L_norm = normalize(L);
 			vec3 D = normalize(u_light_front);
-			float cos_angle = dot( D, L_norm );
+			float cos_angle = dot( D, -L_norm );
 			if( cos_angle < min_angle_cos  ){
 	 			spot_factor = 0.0;
 			} else if ( cos_angle < max_angle_cos) {
@@ -188,7 +189,7 @@ void main()
 	} 
 
 	vec4 final_color;
-	final_color.xyz = (color.xyz * light) + u_emissive_factor;
+	final_color.xyz = (color.xyz * light) + u_emissive_factor * texture( u_texture_emissive, v_uv ).xyz;
 	final_color.a = color.a;
 	
 	FragColor = final_color;
