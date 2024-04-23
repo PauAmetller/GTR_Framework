@@ -88,6 +88,8 @@ namespace SCN {
 
 		static void registerEntityType(BaseEntity* entity);
 		static BaseEntity* createEntity(const char* type);
+
+		vec3 getGlobalPosition() { return root.global_model.getTranslation(); }
 	};
 
 	//represents one prefab in the scene

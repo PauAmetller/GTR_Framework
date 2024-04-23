@@ -27,8 +27,20 @@ Renderer::Renderer(const char* shader_atlas_filename)
 {
 	render_wireframe = false;
 	render_boundaries = false;
+	deactivate_ambient_light = false;
+	albedo_texture = false;
+	emissive_texture = false;
+	occlusion_texture = false;
+	metallicRoughness_texture = false;
+	normalMap_texture = false;
+	white_textures = false;
+	skip_lights = false;
+	skip_shadows = false;
 	scene = nullptr;
 	skybox_cubemap = nullptr;
+	moon_light = nullptr;
+
+	shadow_map_size = 1024;
 
 	if (!GFX::Shader::LoadAtlas(shader_atlas_filename))
 		exit(1);
@@ -36,6 +48,10 @@ Renderer::Renderer(const char* shader_atlas_filename)
 
 	sphere.createSphere(1.0f);
 	sphere.uploadToVRAM();
+
+	for (int i = 0; i < NUM_SHADOW_MAPS; i++) {
+		shadow_maps[i] = nullptr;
+	}
 }
 
 void Renderer::setupScene()
@@ -60,15 +76,18 @@ void Renderer::extractRenderables(SCN::Node* node, Camera* camera) {
 		//compute the bounding box of the object in the world space
 		BoundingBox world_bounding = transformBoundingBox(node_model, node->mesh->box);
 
-		//if bounding box inside camera
-		if (camera->testBoxInFrustum(world_bounding.center, world_bounding.halfsize)) {
-			Renderable re;
-			re.model = node_model;
-			re.mesh = node->mesh;
-			re.material = node->material;
-			re.distance_to_camera = camera->eye.distance(world_bounding.center);
-			re.bounding = world_bounding;
-			renderables.push_back(re);
+		Renderable re;
+		re.model = node_model;
+		re.mesh = node->mesh;
+		re.material = node->material;
+		re.distance_to_camera = camera->eye.distance(world_bounding.center);
+		re.bounding = world_bounding;
+		renderables.push_back(re);
+		if (re.material->alpha_mode == SCN::eAlphaMode::BLEND) {
+			alphaRenderables.push_back(re);
+		}
+		else {
+			opaqueRenderables.push_back(re);
 		}
 	}
 
@@ -82,6 +101,9 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 
 	renderables.clear();
 	lights.clear();
+	opaqueRenderables.clear();
+	alphaRenderables.clear();
+	moon_light = nullptr;
 
 	//prepare entities
 	for (size_t i = 0; i < scene->entities.size(); i++) {
@@ -106,10 +128,65 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 			if (light->light_type == SCN::eLightType::DIRECTIONAL || camera->testSphereInFrustum(model.getTranslation(), light->max_distance)) {
 				lights.push_back(light);
 			}
+			if (!moon_light && light->light_type == SCN::eLightType::DIRECTIONAL) {
+				moon_light = light;
+			}
 		}
 	}
 }
 
+void Renderer::generateShadowMaps(Camera* main_camera) {
+	int i = 0;
+	Camera camera;
+	for (LightEntity* light : lights) {
+		light->has_shadow_map = false;;
+		if (light->light_type == SCN::eLightType::POINT || !light->cast_shadows) {
+			continue;
+		}
+		else {
+			light->has_shadow_map = true;
+			if (shadow_maps[i] == nullptr || shadow_maps[i]->width != shadow_map_size) {
+				if (shadow_maps[i])
+					delete shadow_maps[i];
+				shadow_maps[i] = new GFX::FBO();
+				shadow_maps[i]->setDepthOnly(shadow_map_size, shadow_map_size);
+			}
+			shadow_maps[i]->bind();
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			vec3 pos= light->getGlobalPosition();
+			if (light->light_type == SCN::eLightType::DIRECTIONAL) {
+				pos = main_camera->eye;
+				camera.lookAt(pos, pos + light->root.global_model.frontVector() * -1.0f, vec3(0, 1, 0));
+				camera.setOrthographic(light->area * -0.5, light->area * 0.5, light->area * -0.5, light->area * 0.5, light->near_distance, light->max_distance);
+			}
+			else if (light->light_type == SCN::eLightType::SPOT) {
+				camera.lookAt(pos, pos + light->root.global_model.frontVector(), vec3(0, 1, 0));
+				camera.setPerspective(light->cone_info.x, 1.0f, light->near_distance, light->max_distance);
+			}
+
+			// compute texel size in world units, where frustum size is the distance from left to right in the camera
+			float grid = light->area / (float)shadow_maps[i]->width;
+
+			camera.enable();
+
+			//snap camera X,Y to that size in camera space assumingthe frustum is square, otherwise compute gridx and gridy
+			camera.view_matrix.M[3][0] = round(camera.view_matrix.M[3][0] / grid) * grid;
+			camera.view_matrix.M[3][1] = round(camera.view_matrix.M[3][1] / grid) * grid;
+
+			//update viewproj matrix (be sure no one changes it)
+			camera.viewprojection_matrix = camera.view_matrix * camera.projection_matrix;
+
+			for (auto& re : opaqueRenderables) {
+				renderMeshWithMaterialFlat(re.model, re.mesh, re.material);
+			}
+			light->shadowmap_view_projection = camera.viewprojection_matrix;
+
+			shadow_maps[i]->unbind();
+			i++;
+		}
+	}
+}
 ////////////////
 
 
@@ -118,6 +195,10 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	this->scene = scene;
 	setupScene();
 	extractSceneInfo(scene, camera);
+	if(!skip_shadows)
+		generateShadowMaps(camera);
+
+	camera->enable();
 
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
@@ -134,30 +215,31 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 		renderSkybox(skybox_cubemap);
 
 	//////////////
-	std::vector<Renderable> opaqueRenderables;
-	std::vector<Renderable> alphaRenderables;
-
-	//Separates the opaque and alpha renderables into two lists
-	for (Renderable& re : renderables) {
-		if (re.material->alpha_mode == SCN::eAlphaMode::NO_ALPHA) { 
-			opaqueRenderables.push_back(re);
-		}
-		else {
-			alphaRenderables.push_back(re);
-		}
-	}
-
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera);});
 
 	// Render opaque objects first
 	for (Renderable& re : opaqueRenderables) {
-		renderMeshWithMaterialLights(re.model, re.mesh, re.material);
+		//if bounding box inside camera
+		if (camera->testBoxInFrustum(re.bounding.center, re.bounding.halfsize))
+			if (skip_lights) {
+				renderMeshWithMaterial(re.model, re.mesh, re.material);
+			}
+			else {
+				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
+			}
 	}
 
 	// Then render alpha objects
 	for (Renderable& re : alphaRenderables) {
-		renderMeshWithMaterialLights(re.model, re.mesh, re.material);
+		//if bounding box inside camera
+		if (camera->testBoxInFrustum(re.bounding.center, re.bounding.halfsize))
+			if (skip_lights) {
+				renderMeshWithMaterial(re.model, re.mesh, re.material);
+			}
+			else {
+				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
+			}
 	}
 	opaqueRenderables.clear();
 	alphaRenderables.clear();
@@ -222,6 +304,63 @@ void Renderer::renderNode(SCN::Node* node, Camera* camera)
 }
 
 //renders a mesh given its transform and material
+void Renderer::renderMeshWithMaterialFlat(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material)
+{
+	//in case there is nothing to do
+	if (!mesh || !mesh->getNumVertices() || !material)
+		return;
+	assert(glGetError() == GL_NO_ERROR);
+
+	//define locals to simplify coding
+	GFX::Shader* shader = NULL;
+	GFX::Texture* texture = NULL;
+	Camera* camera = Camera::current;
+
+	texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+
+	if (texture == NULL)
+		texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+
+	glDisable(GL_BLEND);
+
+	//select if render both sides of the triangles
+	if (material->two_sided)
+		glDisable(GL_CULL_FACE);
+	else
+		glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
+
+	glEnable(GL_DEPTH_TEST);
+
+	//chose a shader
+	shader = GFX::Shader::Get("texture");
+
+	assert(glGetError() == GL_NO_ERROR);
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+	shader->enable();
+
+	//upload uniforms
+	shader->setUniform("u_model", model);
+	cameraToShader(camera, shader);
+
+	shader->setUniform("u_color", material->color);
+	if (texture)
+		shader->setUniform("u_texture", texture, 0);
+
+	//this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
+	shader->setUniform("u_alpha_cutoff", material->alpha_mode == SCN::eAlphaMode::MASK ? material->alpha_cutoff : 0.001f);
+
+	//do the draw call that renders the mesh into the screen
+	mesh->render(GL_TRIANGLES);
+
+	//disable shader
+	shader->disable();
+}
+
+//renders a mesh given its transform and material
 void Renderer::renderMeshWithMaterial(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material)
 {
 	//in case there is nothing to do
@@ -234,7 +373,9 @@ void Renderer::renderMeshWithMaterial(const Matrix44 model, GFX::Mesh* mesh, SCN
 	GFX::Texture* texture = NULL;
 	Camera* camera = Camera::current;
 	
-	texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+	if (!white_textures) {
+		texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+	}
 	//texture = material->emissive_texture;
 	//texture = material->metallic_roughness_texture;
 	//texture = material->normal_texture;
@@ -313,12 +454,21 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	GFX::Texture* textureNormalMap = NULL;
 	GFX::Texture* textureOcclusion = NULL;
 	Camera* camera = Camera::current;
-
-	textureAlbedo = material->textures[SCN::eTextureChannel::ALBEDO].texture;
-	textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
-	textureMetallicRoughness = material->textures[SCN::eTextureChannel::METALLIC_ROUGHNESS].texture;
-	textureNormalMap = material->textures[SCN::eTextureChannel::NORMALMAP].texture;
-	textureOcclusion = material->textures[SCN::eTextureChannel::OCCLUSION].texture;
+	if (!white_textures && !albedo_texture) {
+		textureAlbedo = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+	}
+	if (!white_textures && !emissive_texture) {
+		textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
+	}
+	if (!white_textures && !metallicRoughness_texture) {
+		textureMetallicRoughness = material->textures[SCN::eTextureChannel::METALLIC_ROUGHNESS].texture;
+	}
+	if (!white_textures && !normalMap_texture) {
+		textureNormalMap = material->textures[SCN::eTextureChannel::NORMALMAP].texture;
+	}
+	if (!white_textures && !occlusion_texture) {
+		textureOcclusion = material->textures[SCN::eTextureChannel::OCCLUSION].texture;
+	}
 
 	if (textureAlbedo == NULL)
 		textureAlbedo = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
@@ -365,8 +515,18 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	float t = getTime();
 	shader->setUniform("u_time", t);
 	////////////
-	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_emissive_factor", material->emissive_factor);
+	if (!deactivate_ambient_light) {
+		shader->setUniform("u_ambient_light", scene->ambient_light);
+	}
+	else {
+		shader->setUniform("u_ambient_light", vec3(0.0));
+	}
+	if (!white_textures && !emissive_texture) {
+		shader->setUniform("u_emissive_factor", material->emissive_factor);
+	}
+	else {
+		shader->setUniform("u_emissive_factor", vec3(0.0));
+	}
 
 	shader->setUniform("u_color", material->color);
 	shader->setUniform("u_texture_albedo", textureAlbedo, 0);
@@ -389,9 +549,19 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	glDepthFunc(GL_LEQUAL);
 
 	//multi_pass
+	int i = 0;
 	if (lights.size()) {
 		for (LightEntity* light : lights) {
 			lightToShader(light, shader);
+
+			if (light->has_shadow_map) {
+				shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
+				shader->setUniform("u_shadow_map", shadow_maps[i]->depth_texture, 8);
+				shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
+				shader->setUniform("u_shadow_bias", light->shadow_bias);
+				i++;
+			}
+
 			mesh->render(GL_TRIANGLES);
 			glEnable(GL_BLEND);
 			shader->setUniform("u_ambient_light", vec3(0.0));
@@ -440,7 +610,15 @@ void Renderer::showUI()
 	ImGui::Checkbox("Boundaries", &render_boundaries);
 
 	//add here your stuff
-	//...
+	ImGui::Checkbox("Deactivate_ambient_light", &deactivate_ambient_light);
+	ImGui::Checkbox("Deactivate_Albedo_texture", &albedo_texture);
+	ImGui::Checkbox("Deactivate_Emissive_texture", &emissive_texture);
+	ImGui::Checkbox("Deactivate_MetallicRoughness_texture", &metallicRoughness_texture);
+	ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
+	ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
+	ImGui::Checkbox("Remove_textures", &white_textures);
+	ImGui::Checkbox("Remove_lights", &skip_lights);
+	ImGui::Checkbox("Remove_shadows", &skip_shadows);
 }
 
 #else

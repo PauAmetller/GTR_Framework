@@ -14,6 +14,7 @@ SCN::LightEntity::LightEntity()
 	shadow_bias = 0.001;
 	near_distance = 0.1;
 	area = 1000;
+	has_shadow_map = false;
 }
 
 void SCN::LightEntity::configure(cJSON* json)

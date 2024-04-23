@@ -25,6 +25,9 @@ namespace SCN {
 		vec2 cone_info;
 		float area; //for direct;
 
+		bool has_shadow_map;
+		mat4 shadowmap_view_projection;
+
 		ENTITY_METHODS(LightEntity, LIGHT, 14,4);
 
 		LightEntity();

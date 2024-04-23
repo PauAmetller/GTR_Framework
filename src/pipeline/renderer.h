@@ -4,6 +4,8 @@
 
 #include "light.h"
 
+#define NUM_SHADOW_MAPS 4
+
 //forward declarations
 class Camera;
 class Skeleton;
@@ -36,13 +38,28 @@ namespace SCN {
 	public:
 		bool render_wireframe;
 		bool render_boundaries;
+		bool deactivate_ambient_light;
+		bool albedo_texture;
+		bool emissive_texture;
+		bool occlusion_texture;
+		bool metallicRoughness_texture;
+		bool normalMap_texture;
+		bool white_textures;
+		bool skip_lights;
+		bool skip_shadows;
+
+		int shadow_map_size;
 
 		GFX::Texture* skybox_cubemap;
+		GFX::FBO* shadow_maps[NUM_SHADOW_MAPS];
 
 		SCN::Scene* scene;
 
 		std::vector<Renderable> renderables; ///////////
+		std::vector<Renderable> opaqueRenderables;
+		std::vector<Renderable> alphaRenderables;
 		std::vector<LightEntity*> lights; //////////
+		LightEntity* moon_light; ////////
 
 		//updated every frame
 		Renderer(const char* shaders_atlas_filename );
@@ -53,6 +70,7 @@ namespace SCN {
 		//add here your functions////////////////
 		void extractRenderables(SCN::Node* node, Camera* camera);
 		void extractSceneInfo(SCN::Scene* scene, Camera* camera);
+		void generateShadowMaps(Camera* main_camera);
 		/////////////
 
 		//renders several elements of the scene
@@ -63,6 +81,8 @@ namespace SCN {
 	
 		//to render one node from the prefab and its children
 		void renderNode(SCN::Node* node, Camera* camera);
+
+		void renderMeshWithMaterialFlat(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material);
 
 		//to render one mesh given its material and transformation matrix
 		void renderMeshWithMaterial(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material);

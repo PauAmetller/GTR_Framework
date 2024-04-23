@@ -125,6 +125,12 @@ uniform sampler2D u_texture_metallic_roughness; //Still not used
 uniform float u_time;
 uniform float u_alpha_cutoff;
 
+//Shadow_map resources
+uniform int u_light_cast_shadow;
+uniform sampler2D u_shadow_map;
+uniform mat4 u_shadow_map_view_projection;
+uniform float u_shadow_bias;
+
 uniform vec3 u_ambient_light;
 uniform vec3 u_emissive_factor;
 uniform vec3 u_light_position;
@@ -140,6 +146,40 @@ uniform int u_light_type;
 #define DIRECTIONALLIGHT 3
 
 out vec4 FragColor;
+
+float computeShadow( vec3 wp){
+	//project our 3D position to the shadowmap
+	vec4 proj_pos = u_shadow_map_view_projection * vec4(wp,1.0);
+
+	//from homogeneus space to clip space
+	vec2 shadow_uv = proj_pos.xy / proj_pos.w;
+
+	//from clip space to uv space
+	shadow_uv = shadow_uv * 0.5 + vec2(0.5);
+
+	//it is outside on the sides, or it is before near or behind far plane
+	if( shadow_uv.x < 0.0 || shadow_uv.y < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y > 1.0){
+		return 1.0;
+	}
+
+	//get point depth [-1 .. +1] in non-linear space
+	float real_depth = (proj_pos.z - u_shadow_bias) / proj_pos.w;
+
+	//normalize from [-1..+1] to [0..+1] still non-linear
+	real_depth = real_depth * 0.5 + 0.5;
+
+	//read depth from depth buffer in [0..+1] non-linear
+	float shadow_depth = texture( u_shadow_map, shadow_uv).x;
+
+	//compute final shadow factor by comparing
+	float shadow_factor = 1.0;
+
+	//we can compare them, even if they are not linear
+	if( shadow_depth < real_depth )
+		shadow_factor = 0.0;
+	return shadow_factor;
+
+}
 
 mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
 {
@@ -182,10 +222,12 @@ void main()
 	vec3 L;
 
 	vec3 light_add;
-	
+	float shadow_factor = 1.0;
+	if(u_light_cast_shadow == 1)
+		shadow_factor = computeShadow(v_world_position);
 	if ( u_light_type == DIRECTIONALLIGHT)
 	{
-		L = u_light_front;	
+		L = u_light_front;
 		light_add = u_light_color;
 	}
 	else if (u_light_type == SPOTLIGHT || u_light_type == POINTLIGHT) //spot and point
@@ -199,7 +241,7 @@ void main()
 		if (u_light_type == SPOTLIGHT){
 			vec3 L_norm = normalize(L);
 			vec3 D = normalize(u_light_front);
-			float cos_angle = dot( D, -L_norm );
+			float cos_angle = dot( D, L_norm );
 			if( cos_angle < min_angle_cos  ){
 	 			spot_factor = 0.0;
 			} else if ( cos_angle < max_angle_cos) {
@@ -218,7 +260,7 @@ void main()
     	vec3 perturbed_normal = perturbNormal(v_normal, v_world_position, v_uv, normal);
 	float NdotL = clamp(max(dot(perturbed_normal, L), 0.0), 0.0, 1.0);
 
-	light += (NdotL * light_add);
+	light += (NdotL * light_add  * shadow_factor);
 
 	vec4 final_color;
 	final_color.xyz = (color.xyz * light) + u_emissive_factor * texture( u_texture_emissive, v_uv ).xyz;
