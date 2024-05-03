@@ -17,11 +17,15 @@
 
 #include "scene.h"
 
+///////////////////////////////////Pau//////////////////////////////////
 
 using namespace SCN;
 
 //some globals
 GFX::Mesh sphere;
+GFX::Mesh cube;
+
+GFX::FBO* gbuffers = nullptr;
 
 Renderer::Renderer(const char* shader_atlas_filename)
 {
@@ -39,6 +43,9 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
+
+	pipeline_mode = ePipelineMode::DEFERRED;
+	show_gbuffer = eShowGBuffer::NONE;
 
 	shadow_map_size = 1024;
 
@@ -136,8 +143,8 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 }
 
 void Renderer::generateShadowMaps(Camera* main_camera) {
-	int i = 0;
-	Camera camera;
+	shadow_map_index = 0;
+	
 	for (LightEntity* light : lights) {
 		light->has_shadow_map = false;;
 		if (light->light_type == SCN::eLightType::POINT || !light->cast_shadows) {
@@ -145,15 +152,16 @@ void Renderer::generateShadowMaps(Camera* main_camera) {
 		}
 		else {
 			light->has_shadow_map = true;
-			if (shadow_maps[i] == nullptr || shadow_maps[i]->width != shadow_map_size) {
-				if (shadow_maps[i])
-					delete shadow_maps[i];
-				shadow_maps[i] = new GFX::FBO();
-				shadow_maps[i]->setDepthOnly(shadow_map_size, shadow_map_size);
+			if (shadow_maps[shadow_map_index] == nullptr || shadow_maps[shadow_map_index]->width != shadow_map_size) {
+				if (shadow_maps[shadow_map_index])
+					delete shadow_maps[shadow_map_index];
+				shadow_maps[shadow_map_index] = new GFX::FBO();
+				shadow_maps[shadow_map_index]->setDepthOnly(shadow_map_size, shadow_map_size);
 			}
-			shadow_maps[i]->bind();
+			shadow_maps[shadow_map_index]->bind();
 			glClear(GL_DEPTH_BUFFER_BIT);
 
+			Camera camera;
 			vec3 pos= light->getGlobalPosition();
 			if (light->light_type == SCN::eLightType::DIRECTIONAL) {
 				pos = main_camera->eye;
@@ -161,12 +169,13 @@ void Renderer::generateShadowMaps(Camera* main_camera) {
 				camera.setOrthographic(light->area * -0.5, light->area * 0.5, light->area * -0.5, light->area * 0.5, light->near_distance, light->max_distance);
 			}
 			else if (light->light_type == SCN::eLightType::SPOT) {
-				camera.lookAt(pos, pos + light->root.global_model.frontVector(), vec3(0, 1, 0));
-				camera.setPerspective(light->cone_info.x, 1.0f, light->near_distance, light->max_distance);
+				vec3 front = light->root.model.rotateVector(vec3(0, 0, 1));
+				camera.lookAt(pos, pos + front * -1.0f, vec3(0, 1, 0));
+				camera.setPerspective(light->cone_info.y, 1.0f, light->near_distance, light->max_distance);
 			}
 
 			// compute texel size in world units, where frustum size is the distance from left to right in the camera
-			float grid = light->area / (float)shadow_maps[i]->width;
+			float grid = light->area / (float)shadow_maps[shadow_map_index]->width;
 
 			camera.enable();
 
@@ -178,12 +187,17 @@ void Renderer::generateShadowMaps(Camera* main_camera) {
 			camera.viewprojection_matrix = camera.view_matrix * camera.projection_matrix;
 
 			for (auto& re : opaqueRenderables) {
-				renderMeshWithMaterialFlat(re.model, re.mesh, re.material);
+				if (camera.testBoxInFrustum(re.bounding.center, re.bounding.halfsize))
+					renderMeshWithMaterialFlat(re.model, re.mesh, re.material);
 			}
 			light->shadowmap_view_projection = camera.viewprojection_matrix;
 
-			shadow_maps[i]->unbind();
-			i++;
+			shadow_maps[shadow_map_index]->unbind();
+
+			if (shadow_map_index < NUM_SHADOW_MAPS - 1)
+				shadow_map_index++;
+			else
+				printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
 		}
 	}
 }
@@ -195,9 +209,18 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	this->scene = scene;
 	setupScene();
 	extractSceneInfo(scene, camera);
-	if(!skip_shadows)
+	if (!skip_shadows)
 		generateShadowMaps(camera);
 
+	if (pipeline_mode == ePipelineMode::FORWARD)
+		renderSceneForward(scene, camera);
+	else if (pipeline_mode == ePipelineMode::DEFERRED)
+		renderSceneDeferred(scene, camera);
+
+}
+
+void Renderer::renderSceneForward(SCN::Scene* scene, Camera* camera)
+{
 	camera->enable();
 
 	glDisable(GL_BLEND);
@@ -241,9 +264,121 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
+
 	opaqueRenderables.clear();
 	alphaRenderables.clear();
 	////////////////
+}
+
+void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
+
+	vec2 size = CORE::getWindowSize();
+
+	//generear los GBuffers
+	if (!gbuffers)
+	{
+		gbuffers = new GFX::FBO();
+		gbuffers->create(size.x, size.y, 3, GL_RGBA, GL_UNSIGNED_BYTE, true);
+	}
+	gbuffers->bind();
+	camera->enable();
+
+	glEnable(GL_DEPTH_TEST);
+
+	glClearColor(0, 0, 0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+	// Render opaque objects first
+	for (Renderable& re : opaqueRenderables) {
+		//if bounding box inside camera
+		if (camera->testBoxInFrustum(re.bounding.center, re.bounding.halfsize))
+			renderMeshWithMaterialGBuffers(re.model, re.mesh, re.material);
+	}
+
+	gbuffers->unbind();
+
+	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
+	glClearColor(0, 0, 0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	GFX::checkGLErrors();
+
+	if (skybox_cubemap)
+		renderSkybox(skybox_cubemap);
+
+	//draw the lights
+	GFX::Mesh* quad = GFX::Mesh::getQuad();
+	GFX::Shader* deferred_global = GFX::Shader::Get("deferred_global");
+	assert(deferred_global);
+	deferred_global->enable();
+	deferred_global->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+	deferred_global->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+	deferred_global->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+	deferred_global->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+
+	deferred_global->setUniform("u_ambient_light", scene->ambient_light);
+	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+
+	glEnable(GL_DEPTH_TEST);
+
+
+	glDepthFunc(GL_ALWAYS);
+	glDisable(GL_BLEND);
+	shadow_map_index = 0;
+	if (lights.size() && (!skip_lights)) {
+		for (LightEntity* light : lights) {
+			lightToShader(light, deferred_global);
+
+			if (light->has_shadow_map) {
+				deferred_global->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
+				deferred_global->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
+				deferred_global->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
+				deferred_global->setUniform("u_shadow_bias", light->shadow_bias);
+				if (shadow_map_index < NUM_SHADOW_MAPS - 1)
+					shadow_map_index++;
+				else
+					printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
+			}
+
+			quad->render(GL_TRIANGLES);
+			deferred_global->setUniform("u_ambient_light", vec3(0.0));
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+			glDisable(GL_DEPTH_TEST);
+		}
+	}
+	else {
+		deferred_global->setUniform("u_light_type", 0);
+		quad->render(GL_TRIANGLES);
+	}
+
+	// Sort by distance_to_camera from far to near
+	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
+
+	// Then render alpha objects
+	for (Renderable& re : alphaRenderables) {
+		//if bounding box inside camera
+		if (camera->testBoxInFrustum(re.bounding.center, re.bounding.halfsize))
+			if (skip_lights) {
+				renderMeshWithMaterial(re.model, re.mesh, re.material);
+			}
+			else {
+				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
+			}
+	}
+
+	glDisable(GL_DEPTH_TEST);
+
+	if (show_gbuffer == eShowGBuffer::COLOR)
+		gbuffers->color_textures[0]->toViewport();
+	if (show_gbuffer == eShowGBuffer::NORMAL)
+		gbuffers->color_textures[1]->toViewport();
+	if (show_gbuffer == eShowGBuffer::EXTRA)
+		gbuffers->color_textures[2]->toViewport();
+	if (show_gbuffer == eShowGBuffer::DEPTH)  //Needs to be done use the depth shader
+		gbuffers->depth_texture->toViewport();
+
 }
 
 
@@ -335,6 +470,64 @@ void Renderer::renderMeshWithMaterialFlat(const Matrix44 model, GFX::Mesh* mesh,
 	//chose a shader
 	shader = GFX::Shader::Get("texture");
 
+	assert(glGetError() == GL_NO_ERROR);
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+	shader->enable();
+
+	//upload uniforms
+	shader->setUniform("u_model", model);
+	cameraToShader(camera, shader);
+
+	shader->setUniform("u_color", material->color);
+	if (texture)
+		shader->setUniform("u_texture", texture, 0);
+
+	//this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
+	shader->setUniform("u_alpha_cutoff", material->alpha_mode == SCN::eAlphaMode::MASK ? material->alpha_cutoff : 0.001f);
+
+	//do the draw call that renders the mesh into the screen
+	mesh->render(GL_TRIANGLES);
+
+	//disable shader
+	shader->disable();
+}
+
+//renders a mesh given its transform and material
+void Renderer::renderMeshWithMaterialGBuffers(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material)
+{
+	//in case there is nothing to do
+	if (!mesh || !mesh->getNumVertices() || !material)
+		return;
+	assert(glGetError() == GL_NO_ERROR);
+
+	//define locals to simplify coding
+	GFX::Shader* shader = NULL;
+	GFX::Texture* texture = NULL;
+	Camera* camera = Camera::current;
+
+	if (!white_textures && !albedo_texture)
+			texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+
+	if (texture == NULL)
+		texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+
+	glDisable(GL_BLEND);
+
+	//select if render both sides of the triangles
+	if (material->two_sided)
+		glDisable(GL_CULL_FACE);
+	else
+		glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
+
+	glEnable(GL_DEPTH_TEST);
+
+	//chose a shader
+	shader = GFX::Shader::Get("gbuffers");
+	assert(shader);
 	assert(glGetError() == GL_NO_ERROR);
 
 	//no shader? then nothing to render
@@ -454,20 +647,17 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	GFX::Texture* textureNormalMap = NULL;
 	GFX::Texture* textureOcclusion = NULL;
 	Camera* camera = Camera::current;
-	if (!white_textures && !albedo_texture) {
-		textureAlbedo = material->textures[SCN::eTextureChannel::ALBEDO].texture;
-	}
-	if (!white_textures && !emissive_texture) {
-		textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
-	}
-	if (!white_textures && !metallicRoughness_texture) {
-		textureMetallicRoughness = material->textures[SCN::eTextureChannel::METALLIC_ROUGHNESS].texture;
-	}
-	if (!white_textures && !normalMap_texture) {
-		textureNormalMap = material->textures[SCN::eTextureChannel::NORMALMAP].texture;
-	}
-	if (!white_textures && !occlusion_texture) {
-		textureOcclusion = material->textures[SCN::eTextureChannel::OCCLUSION].texture;
+	if (!white_textures) {
+		if(!albedo_texture)
+			textureAlbedo = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+		if (!emissive_texture)
+			textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
+		if (!metallicRoughness_texture)
+			textureMetallicRoughness = material->textures[SCN::eTextureChannel::METALLIC_ROUGHNESS].texture;
+		if (!normalMap_texture)
+			textureNormalMap = material->textures[SCN::eTextureChannel::NORMALMAP].texture;
+		if (!occlusion_texture)
+			textureOcclusion = material->textures[SCN::eTextureChannel::OCCLUSION].texture;
 	}
 
 	if (textureAlbedo == NULL)
@@ -549,17 +739,20 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	glDepthFunc(GL_LEQUAL);
 
 	//multi_pass
-	int i = 0;
+	int shadow_map_index = 0;
 	if (lights.size()) {
 		for (LightEntity* light : lights) {
 			lightToShader(light, shader);
 
 			if (light->has_shadow_map) {
 				shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
-				shader->setUniform("u_shadow_map", shadow_maps[i]->depth_texture, 8);
+				shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
 				shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
 				shader->setUniform("u_shadow_bias", light->shadow_bias);
-				i++;
+				if (shadow_map_index < NUM_SHADOW_MAPS - 1)
+					shadow_map_index++;
+				else
+					printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
 			}
 
 			mesh->render(GL_TRIANGLES);
@@ -605,11 +798,13 @@ void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader)
 
 void Renderer::showUI()
 {
-		
+	
+	ImGui::Combo("Pipeline", (int*)&pipeline_mode, "FLAT\0FORWARD\0DEFERRED\0", ePipelineMode::PIPELINE_COUNT);
+	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMAL\0DEPTH\0EXTRA\0", eShowGBuffer::GBUFFERS_COUNT);
+
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);
 
-	//add here your stuff
 	ImGui::Checkbox("Deactivate_ambient_light", &deactivate_ambient_light);
 	ImGui::Checkbox("Deactivate_Albedo_texture", &albedo_texture);
 	ImGui::Checkbox("Deactivate_Emissive_texture", &emissive_texture);
@@ -619,6 +814,15 @@ void Renderer::showUI()
 	ImGui::Checkbox("Remove_textures", &white_textures);
 	ImGui::Checkbox("Remove_lights", &skip_lights);
 	ImGui::Checkbox("Remove_shadows", &skip_shadows);
+
+
+	// Create a slider for the exponent
+	if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
+		// Calculate the actual shadowmap size as a power of two
+		shadow_map_size = (1 << power_of_two);
+	}
+	// Display the actual shadowmap size
+	ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
 }
 
 #else

@@ -69,7 +69,7 @@ void Application::render(void)
 	//Draw the floor grid, helpful to have a reference point
 	if (render_debug)
 	{
-		GFX::drawGrid();
+		//GFX::drawGrid();
 
 		//render debug points 
 		glDisable(GL_DEPTH_TEST);

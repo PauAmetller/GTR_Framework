@@ -15,6 +15,22 @@ namespace GFX {
 	class FBO;
 }
 
+enum ePipelineMode {
+	FLAT,
+	FORWARD,
+	DEFERRED,
+	PIPELINE_COUNT
+};
+
+enum eShowGBuffer {
+	NONE,
+	COLOR,
+	NORMAL,
+	DEPTH,
+	EXTRA,
+	GBUFFERS_COUNT
+};
+
 namespace SCN {
 
 	class Prefab;
@@ -48,7 +64,12 @@ namespace SCN {
 		bool skip_lights;
 		bool skip_shadows;
 
+		int shadow_map_index;
 		int shadow_map_size;
+		int power_of_two = 10; //exponent for shadow_map_size
+
+		ePipelineMode pipeline_mode;
+		eShowGBuffer show_gbuffer;
 
 		GFX::Texture* skybox_cubemap;
 		GFX::FBO* shadow_maps[NUM_SHADOW_MAPS];
@@ -75,6 +96,8 @@ namespace SCN {
 
 		//renders several elements of the scene
 		void renderScene(SCN::Scene* scene, Camera* camera);
+		void renderSceneForward(SCN::Scene* scene, Camera* camera);
+		void renderSceneDeferred(SCN::Scene* scene, Camera* camera);
 
 		//render the skybox
 		void renderSkybox(GFX::Texture* cubemap);
@@ -83,6 +106,8 @@ namespace SCN {
 		void renderNode(SCN::Node* node, Camera* camera);
 
 		void renderMeshWithMaterialFlat(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material);
+
+		void renderMeshWithMaterialGBuffers(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material);
 
 		//to render one mesh given its material and transformation matrix
 		void renderMeshWithMaterial(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material);
