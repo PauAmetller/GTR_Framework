@@ -320,13 +320,14 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 
-	glEnable(GL_DEPTH_TEST);
-
-
-	glDepthFunc(GL_ALWAYS);
-	glDisable(GL_BLEND);
 	shadow_map_index = 0;
 	if (lights.size() && (!skip_lights)) {
+
+		glEnable(GL_DEPTH_TEST);
+
+		glDepthFunc(GL_ALWAYS);
+		glDisable(GL_BLEND);
+
 		for (LightEntity* light : lights) {
 			lightToShader(light, deferred_global);
 
@@ -352,6 +353,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		deferred_global->setUniform("u_light_type", 0);
 		quad->render(GL_TRIANGLES);
 	}
+
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });

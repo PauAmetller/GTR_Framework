@@ -126,12 +126,12 @@ float computeShadow( vec3 wp){
 }
 
 \ComputeLights
-
 	vec3 light_add;
 	float shadow_factor = 1.0;
 	if ( u_light_type == DIRECTIONALLIGHT)
 	{
 		L = u_light_front;
+		NdotL = clamp( dot(N,L), 0.0, 1.0 );
 		light_add = u_light_color;
 		if(u_light_cast_shadow == 1)
 			shadow_factor = computeShadow(v_world_position);
@@ -140,18 +140,19 @@ float computeShadow( vec3 wp){
 	{
 		L = u_light_position - v_world_position;
 		float dist = length(L);
+		vec3 L = normalize(L);
+		NdotL = clamp( dot(N,L), 0.0, 1.0 );
 
-		float min_angle_cos = u_light_cone_info.x;
-		float max_angle_cos = u_light_cone_info.y;
-		float spot_factor = 1.0;
+		float min_angle_cos = u_light_cone_info.y;
+		float max_angle_cos = u_light_cone_info.x;
 		if (u_light_type == SPOTLIGHT){
-			vec3 L_norm = normalize(L);
+			NdotL = 1.0;
 			vec3 D = normalize(u_light_front);
-			float cos_angle = dot( D, L_norm );
+			float cos_angle = dot( D, L );
 			if( cos_angle < min_angle_cos  ){
-	 			spot_factor = 0.0;
+	 			NdotL = 0.0;
 			} else if ( cos_angle < max_angle_cos) {
-				spot_factor *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
+				NdotL *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
 			}
 			if(u_light_cast_shadow == 1)
 				shadow_factor = computeShadow(v_world_position);
@@ -161,9 +162,9 @@ float computeShadow( vec3 wp){
 		att_factor /= u_light_max_distance;
 		att_factor = max(att_factor, 0.0);
 		
-		light_add = u_light_color * att_factor * spot_factor;
+		light_add = u_light_color * att_factor;
 	} 
-	light_add *= shadow_factor;
+	light_add *= shadow_factor * NdotL;
 
 
 
@@ -375,15 +376,15 @@ void main()
 	if(color.a < u_alpha_cutoff)
 		discard;
 
-	vec3 light = u_ambient_light * texture(u_texture_occlusion, v_uv).xyz;
+	vec3 light = u_ambient_light * texture(u_texture_occlusion, v_uv).x;
 	
 	vec3 L;
 
-	#include ComputeLights
-
 	vec3 normal = texture(u_texture_normalmap, v_uv).xyz;
-    	vec3 perturbed_normal = perturbNormal(v_normal, v_world_position, v_uv, normal);
-	float NdotL = clamp(max(dot(perturbed_normal, L), 0.0), 0.0, 1.0);
+    	vec3 N = perturbNormal(v_normal, v_world_position, v_uv, normal);
+	float NdotL = 0.0;
+
+	#include ComputeLights
 
 	light += (NdotL * light_add);
 
