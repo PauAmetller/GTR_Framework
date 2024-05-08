@@ -179,12 +179,17 @@ in vec2 v_uv;
 
 uniform vec4 u_color;
 uniform sampler2D u_texture;
+uniform sampler2D u_texture_emissive;
+uniform sampler2D u_texture_normalmap;
+uniform sampler2D u_texture_occlusion;
 uniform float u_time;
 uniform float u_alpha_cutoff;
+uniform vec3 u_emissive_factor;
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalColor;
-layout(location = 2) out vec4 ExtraColor;
+layout(location = 2) out vec4 EmissiveOcclusion;
+layout(location = 3) out vec4 NormalMap;
 
 void main()
 {
@@ -200,8 +205,9 @@ void main()
 	FragColor = color;
 	NormalColor = vec4(N * 0.5 + vec3(0.5),1.0);
 
-	ExtraColor = vec4(fract(v_world_position), 1.0);
-}
+	EmissiveOcclusion = vec4(texture( u_texture_emissive, uv ).xyz * u_emissive_factor, texture( u_texture_occlusion, uv ).x);
+	NormalMap = vec4(texture( u_texture_normalmap, uv ).xyz, 1.0);
+} 
 
 \texture.fs
 
@@ -238,11 +244,14 @@ void main()
 
 in vec3 v_position;
 in vec2 v_uv;
+in vec3 v_world_position;
+//in vec3 v_normal;
 
 uniform sampler2D u_color_texture;
 uniform sampler2D u_normal_texture;
-uniform sampler2D u_extra_texture;
 uniform sampler2D u_depth_texture;
+uniform sampler2D u_emissive_occlusion_texture;
+uniform sampler2D u_normalmap_texture;
 
 uniform vec3 u_ambient_light;
 
@@ -252,6 +261,8 @@ uniform int u_light_type;
 uniform vec3 u_light_front;
 uniform vec2 u_light_cone_info;
 uniform float u_light_max_distance;
+uniform vec3 u_emissive_first;
+uniform bool u_norm_contr;
 
 uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
@@ -264,14 +275,46 @@ out vec4 FragColor;
 out float glFragDepth;
 
 #include "ComputeShadow"
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
+{
+	// get edge vectors of the pixel triangle
+	vec3 dp1 = dFdx( p );
+	vec3 dp2 = dFdy( p );
+	vec2 duv1 = dFdx( uv );
+	vec2 duv2 = dFdy( uv );
+	
+	// solve the linear system
+	vec3 dp2perp = cross( dp2, N );
+	vec3 dp1perp = cross( N, dp1 );
+	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+ 
+	// construct a scale-invariant frame 
+	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+	return mat3( T * invmax, B * invmax, N );
+}
+
+vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
+{
+	normal_pixel = normal_pixel * 255./127. - 128./127.;
+	mat3 TBN = cotangent_frame(N, WP, uv);
+	return normalize(TBN * normal_pixel);
+}
 
 void main()
 {
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
 
-	vec4 color = texture( u_color_texture, v_uv );
-	vec3 N = texture(u_normal_texture, v_uv).xyz * 2.0 - vec3(1.0);
-	float depth = texture( u_depth_texture, v_uv).x;
+	vec4 color = texture( u_color_texture, uv );
+	//vec3 normal = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	//vec3 N = normalize(normal);
+	//vec3 normal_pixel = texture(u_normalmap_texture, uv).xyz;
+	//N = perturbNormal(normal, v_world_position, uv, normal_pixel);
+	
+
+	float depth = texture( u_depth_texture, uv).x;
+	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
+	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 
 	if(depth == 1)
 		discard;
@@ -280,9 +323,16 @@ void main()
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-	vec3 light = u_ambient_light;
+	vec3 light = u_ambient_light * occlusion;
 
-	N = normalize(N);
+	vec3 normal = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	vec3 N = normalize(normal);
+	vec3 normal_pixel = texture(u_normalmap_texture, uv).xyz;
+	if(!u_norm_contr){
+    		N = perturbNormal(normal, v_world_position, v_uv, normal_pixel);
+	}
+	//N = normalize(N);
+
 	
 	vec3 L;
 	L = u_light_position - v_world_position;
@@ -297,10 +347,11 @@ void main()
 	
 	NdotL = clamp(dot(N,L), 0.0, 1.0);
 
-	final_color = ((NdotL * light_add) + light) * color.xyz;
+	final_color = ((NdotL * light_add) + light) * color.xyz + emissive * u_emissive_first;
 
 	FragColor = vec4(final_color, 1.0);
 	glFragDepth = depth;
+
 }
 
 \light.fs
@@ -321,6 +372,7 @@ uniform sampler2D u_texture_normalmap;
 uniform sampler2D u_texture_metallic_roughness; //Still not used
 uniform float u_time;
 uniform float u_alpha_cutoff;
+uniform bool u_norm_contr;
 
 uniform vec3 u_ambient_light;
 uniform vec3 u_emissive_factor;
@@ -379,9 +431,11 @@ void main()
 	vec3 light = u_ambient_light * texture(u_texture_occlusion, v_uv).x;
 	
 	vec3 L;
-
+	vec3 N = normalize(v_normal);
 	vec3 normal = texture(u_texture_normalmap, v_uv).xyz;
-    	vec3 N = perturbNormal(v_normal, v_world_position, v_uv, normal);
+	if(!u_norm_contr){
+    		N = perturbNormal(v_normal, v_world_position, v_uv, normal);
+	}
 	float NdotL = 0.0;
 
 	#include ComputeLights

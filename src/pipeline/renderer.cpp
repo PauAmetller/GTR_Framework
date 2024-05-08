@@ -27,6 +27,7 @@ GFX::Mesh cube;
 
 GFX::FBO* gbuffers = nullptr;
 
+
 Renderer::Renderer(const char* shader_atlas_filename)
 {
 	render_wireframe = false;
@@ -278,7 +279,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (!gbuffers)
 	{
 		gbuffers = new GFX::FBO();
-		gbuffers->create(size.x, size.y, 3, GL_RGBA, GL_UNSIGNED_BYTE, true);
+		gbuffers->create(size.x, size.y, 4, GL_RGBA, GL_UNSIGNED_BYTE, true);
 	}
 	gbuffers->bind();
 	camera->enable();
@@ -313,12 +314,15 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	deferred_global->enable();
 	deferred_global->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
 	deferred_global->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
-	deferred_global->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
-	deferred_global->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+	deferred_global->setUniform("u_emissive_occlusion_texture", gbuffers->color_textures[2], 2);
+	deferred_global->setUniform("u_normalmap_texture", gbuffers->color_textures[3], 3);
+	deferred_global->setUniform("u_depth_texture", gbuffers->depth_texture, 4);
 
 	deferred_global->setUniform("u_ambient_light", scene->ambient_light);
 	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	deferred_global->setUniform("u_emissive_first", vec3(1.0));
+	deferred_global->setUniform("u_norm_contr", normalMap_texture);
 
 	shadow_map_index = 0;
 	if (lights.size() && (!skip_lights)) {
@@ -344,6 +348,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 			quad->render(GL_TRIANGLES);
 			deferred_global->setUniform("u_ambient_light", vec3(0.0));
+			deferred_global->setUniform("u_emissive_first", vec3(0.0));
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE);
 			glDisable(GL_DEPTH_TEST);
@@ -376,10 +381,19 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		gbuffers->color_textures[0]->toViewport();
 	if (show_gbuffer == eShowGBuffer::NORMAL)
 		gbuffers->color_textures[1]->toViewport();
-	if (show_gbuffer == eShowGBuffer::EXTRA)
+	if (show_gbuffer == eShowGBuffer::EMISSIVE)
 		gbuffers->color_textures[2]->toViewport();
+	/*if (show_gbuffer == eShowGBuffer::OCCLUSION)
+		gbuffers->color_textures[2]->toViewport();*/
+	if (show_gbuffer == eShowGBuffer::NORMALMAP)
+		gbuffers->color_textures[3]->toViewport();
 	if (show_gbuffer == eShowGBuffer::DEPTH)  //Needs to be done use the depth shader
-		gbuffers->depth_texture->toViewport();
+	{
+		GFX::Shader* zshader = GFX::Shader::Get("depth");
+		zshader->enable();
+		zshader->setUniform("u_camera_nearfar", vec2(camera->near_plane, camera->far_plane));
+		gbuffers->depth_texture->toViewport(zshader);
+	}
 
 }
 
@@ -508,13 +522,35 @@ void Renderer::renderMeshWithMaterialGBuffers(const Matrix44 model, GFX::Mesh* m
 	//define locals to simplify coding
 	GFX::Shader* shader = NULL;
 	GFX::Texture* texture = NULL;
+	GFX::Texture* textureEmissive = NULL;
+	GFX::Texture* textureMetallicRoughness = NULL;
+	GFX::Texture* textureNormalMap = NULL;
+	GFX::Texture* textureOcclusion = NULL;
 	Camera* camera = Camera::current;
 
-	if (!white_textures && !albedo_texture)
+	if (!white_textures) {
+		if (!albedo_texture)
 			texture = material->textures[SCN::eTextureChannel::ALBEDO].texture;
+		if (!emissive_texture)
+			textureEmissive = material->textures[SCN::eTextureChannel::EMISSIVE].texture;
+		if (!metallicRoughness_texture)
+			textureMetallicRoughness = material->textures[SCN::eTextureChannel::METALLIC_ROUGHNESS].texture;
+		if (!normalMap_texture)
+			textureNormalMap = material->textures[SCN::eTextureChannel::NORMALMAP].texture;
+		if (!occlusion_texture)
+			textureOcclusion = material->textures[SCN::eTextureChannel::OCCLUSION].texture;
+	}
 
 	if (texture == NULL)
 		texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+	if (textureEmissive == NULL)
+		textureEmissive = GFX::Texture::getWhiteTexture(); //a 1x1 white 
+	if (textureMetallicRoughness == NULL)
+		textureMetallicRoughness = GFX::Texture::getWhiteTexture(); //a 1x1 white 
+	if (textureNormalMap == NULL)
+		textureNormalMap = GFX::Texture::getWhiteTexture(); //a 1x1 white 
+	if (textureOcclusion == NULL)
+		textureOcclusion = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
 	glDisable(GL_BLEND);
 
@@ -542,8 +578,17 @@ void Renderer::renderMeshWithMaterialGBuffers(const Matrix44 model, GFX::Mesh* m
 	cameraToShader(camera, shader);
 
 	shader->setUniform("u_color", material->color);
-	if (texture)
-		shader->setUniform("u_texture", texture, 0);
+	shader->setUniform("u_texture", texture, 0);
+	shader->setUniform("u_texture_emissive", textureEmissive, 1);
+	if (!white_textures && !emissive_texture) {
+		shader->setUniform("u_emissive_factor", material->emissive_factor);
+	}
+	else {
+		shader->setUniform("u_emissive_factor", vec3(0.0));
+	}
+	//shader->setUniform("u_texture_metallic_roughness", textureMetallicRoughness, 2);
+	shader->setUniform("u_texture_normalmap", textureNormalMap, 3);
+	shader->setUniform("u_texture_occlusion", textureOcclusion, 4);
 
 	//this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
 	shader->setUniform("u_alpha_cutoff", material->alpha_mode == SCN::eAlphaMode::MASK ? material->alpha_cutoff : 0.001f);
@@ -719,6 +764,7 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	else {
 		shader->setUniform("u_emissive_factor", vec3(0.0));
 	}
+	shader->setUniform("u_norm_contr", normalMap_texture);
 
 	shader->setUniform("u_color", material->color);
 	shader->setUniform("u_texture_albedo", textureAlbedo, 0);
@@ -802,7 +848,7 @@ void Renderer::showUI()
 {
 	
 	ImGui::Combo("Pipeline", (int*)&pipeline_mode, "FLAT\0FORWARD\0DEFERRED\0", ePipelineMode::PIPELINE_COUNT);
-	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMAL\0DEPTH\0EXTRA\0", eShowGBuffer::GBUFFERS_COUNT);
+	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMAL\0DEPTH\0EMISSIVE\0OCCLUSION\0NORMALMAP", eShowGBuffer::GBUFFERS_COUNT);
 
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);
