@@ -140,6 +140,7 @@ float computeShadow( vec3 wp){
 	{
 		L = u_light_position - v_world_position;
 		float dist = length(L);
+		L = L / dist; 
 		vec3 L = normalize(L);
 		NdotL = clamp( dot(N,L), 0.0, 1.0 );
 
@@ -181,6 +182,7 @@ uniform vec4 u_color;
 uniform sampler2D u_texture;
 uniform sampler2D u_texture_emissive;
 uniform sampler2D u_texture_normalmap;
+uniform sampler2D u_texture_metallic_roughness;
 uniform sampler2D u_texture_occlusion;
 uniform float u_time;
 uniform float u_alpha_cutoff;
@@ -196,17 +198,17 @@ void main()
 	vec2 uv = v_uv;
 	vec4 color = u_color;
 	color *= texture( u_texture, uv );
-
+	
 	if(color.a < u_alpha_cutoff)
 		discard;
 
 	vec3 N = normalize(v_normal);
 
-	FragColor = color;
+	FragColor = vec4(color.xyz, texture( u_texture_metallic_roughness, uv ).z);
 	NormalColor = vec4(N * 0.5 + vec3(0.5),1.0);
 
 	EmissiveOcclusion = vec4(texture( u_texture_emissive, uv ).xyz * u_emissive_factor, texture( u_texture_occlusion, uv ).x);
-	NormalMap = vec4(texture( u_texture_normalmap, uv ).xyz, 1.0);
+	NormalMap = vec4(texture( u_texture_normalmap, uv ).xyz, texture( u_texture_metallic_roughness, uv ).y);
 } 
 
 \texture.fs
@@ -306,10 +308,6 @@ void main()
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
 
 	vec4 color = texture( u_color_texture, uv );
-	//vec3 normal = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
-	//vec3 N = normalize(normal);
-	//vec3 normal_pixel = texture(u_normalmap_texture, uv).xyz;
-	//N = perturbNormal(normal, v_world_position, uv, normal_pixel);
 	
 
 	float depth = texture( u_depth_texture, uv).x;
@@ -331,21 +329,14 @@ void main()
 	if(!u_norm_contr){
     		N = perturbNormal(normal, v_world_position, v_uv, normal_pixel);
 	}
-	//N = normalize(N);
-
 	
 	vec3 L;
-	L = u_light_position - v_world_position;
-	float dist = length(L);
-	L = L / dist; 
 
 	float NdotL = 0.0;
 	
 	#include "ComputeLights"
 
-	vec3 final_color = vec3(0.0);
-	
-	NdotL = clamp(dot(N,L), 0.0, 1.0);
+	vec3 final_color;
 
 	final_color = ((NdotL * light_add) + light) * color.xyz + emissive * u_emissive_first;
 

@@ -25,11 +25,12 @@ enum ePipelineMode {
 enum eShowGBuffer {
 	NONE,
 	COLOR,
+	NORMALMAP,
 	NORMAL,
 	DEPTH,
 	EMISSIVE,
 	OCCLUSION,
-	NORMALMAP,
+	GBUFFERS,
 	GBUFFERS_COUNT
 };
 

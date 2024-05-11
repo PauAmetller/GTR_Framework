@@ -218,6 +218,9 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	else if (pipeline_mode == ePipelineMode::DEFERRED)
 		renderSceneDeferred(scene, camera);
 
+
+	opaqueRenderables.clear();
+	alphaRenderables.clear();
 }
 
 void Renderer::renderSceneForward(SCN::Scene* scene, Camera* camera)
@@ -265,9 +268,6 @@ void Renderer::renderSceneForward(SCN::Scene* scene, Camera* camera)
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
-
-	opaqueRenderables.clear();
-	alphaRenderables.clear();
 	////////////////
 }
 
@@ -289,6 +289,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	glClearColor(0, 0, 0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	// Sort by distance_to_camera from near to far to avoid overdraw
+	std::sort(opaqueRenderables.begin(), opaqueRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera < b.distance_to_camera); });
 
 	// Render opaque objects first
 	for (Renderable& re : opaqueRenderables) {
@@ -359,6 +361,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		quad->render(GL_TRIANGLES);
 	}
 
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
@@ -375,7 +379,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			}
 	}
 
-	glDisable(GL_DEPTH_TEST);
 
 	if (show_gbuffer == eShowGBuffer::COLOR)
 		gbuffers->color_textures[0]->toViewport();
@@ -389,12 +392,34 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		gbuffers->color_textures[3]->toViewport();
 	if (show_gbuffer == eShowGBuffer::DEPTH)  //Needs to be done use the depth shader
 	{
-		GFX::Shader* zshader = GFX::Shader::Get("depth");
-		zshader->enable();
-		zshader->setUniform("u_camera_nearfar", vec2(camera->near_plane, camera->far_plane));
-		gbuffers->depth_texture->toViewport(zshader);
+		GFX::Shader* depth_shader = GFX::Shader::Get("depth");
+		depth_shader->enable();
+		depth_shader->setUniform("u_camera_nearfar", vec2(camera->near_plane, camera->far_plane));
+		gbuffers->depth_texture->toViewport(depth_shader);
 	}
+	if (show_gbuffer == eShowGBuffer::GBUFFERS) {
+		//set an area of the screen and render fullscreen quad
+		glViewport(0, size.y * 0.5, size.x * 0.5, size.y * 0.5);
+		gbuffers->color_textures[0]->toViewport(); //colorbuffer
 
+		glViewport(size.x * 0.5, size.y * 0.5, size.x * 0.5, size.y * 0.5);
+		gbuffers->color_textures[3]->toViewport(); //normalbuffer
+
+		glViewport(size.x * 0.5, 0.0, size.x * 0.5, size.y * 0.5);
+		gbuffers->color_textures[2]->toViewport(); //emissivelbuffer
+
+		//for the depth remember to linearize when displaying it
+		glViewport(0, 0, size.x * 0.5, size.y * 0.5);
+		GFX::Shader* depth_shader = GFX::Shader::Get("depth");
+		depth_shader->enable();
+		vec2 near_far = vec2(camera->near_plane, camera->far_plane);
+		depth_shader->setUniform("u_camera_nearfar", near_far);
+		gbuffers->depth_texture->toViewport(depth_shader);
+
+		//set the viewport back to full screen
+		glViewport(0, 0, size.x, size.y);
+
+	}
 }
 
 
@@ -586,7 +611,7 @@ void Renderer::renderMeshWithMaterialGBuffers(const Matrix44 model, GFX::Mesh* m
 	else {
 		shader->setUniform("u_emissive_factor", vec3(0.0));
 	}
-	//shader->setUniform("u_texture_metallic_roughness", textureMetallicRoughness, 2);
+	shader->setUniform("u_texture_metallic_roughness", textureMetallicRoughness, 2);
 	shader->setUniform("u_texture_normalmap", textureNormalMap, 3);
 	shader->setUniform("u_texture_occlusion", textureOcclusion, 4);
 
@@ -848,7 +873,7 @@ void Renderer::showUI()
 {
 	
 	ImGui::Combo("Pipeline", (int*)&pipeline_mode, "FLAT\0FORWARD\0DEFERRED\0", ePipelineMode::PIPELINE_COUNT);
-	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMAL\0DEPTH\0EMISSIVE\0OCCLUSION\0NORMALMAP", eShowGBuffer::GBUFFERS_COUNT);
+	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMALMAP\0NORMAL\0DEPTH\0EMISSIVE\0OCCLUSION\0GBUFFERS", eShowGBuffer::GBUFFERS_COUNT);
 
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);
