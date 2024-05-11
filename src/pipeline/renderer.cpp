@@ -109,6 +109,8 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 
 	renderables.clear();
 	lights.clear();
+	directional_lights.clear();
+	point_and_spot_lights.clear();
 	opaqueRenderables.clear();
 	alphaRenderables.clear();
 	moon_light = nullptr;
@@ -138,6 +140,14 @@ void Renderer::extractSceneInfo(SCN::Scene* scene, Camera* camera) {
 			}
 			if (!moon_light && light->light_type == SCN::eLightType::DIRECTIONAL) {
 				moon_light = light;
+			}
+			for (LightEntity* light : lights) {
+				if (light->light_type == eLightType::DIRECTIONAL) {
+					directional_lights.push_back(light);
+				}
+				else {
+					point_and_spot_lights.push_back(light);
+				}
 			}
 		}
 	}
@@ -312,6 +322,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	//draw the lights
 	GFX::Mesh* quad = GFX::Mesh::getQuad();
 	GFX::Shader* deferred_global = GFX::Shader::Get("deferred_global");
+
 	assert(deferred_global);
 	deferred_global->enable();
 	deferred_global->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
@@ -331,7 +342,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		glEnable(GL_DEPTH_TEST);
 
-		glDepthFunc(GL_ALWAYS);
+		glDepthFunc(GL_LEQUAL);
 		glDisable(GL_BLEND);
 
 		for (LightEntity* light : lights) {
@@ -353,16 +364,14 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			deferred_global->setUniform("u_emissive_first", vec3(0.0));
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE);
-			glDisable(GL_DEPTH_TEST);
 		}
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
 	}
 	else {
 		deferred_global->setUniform("u_light_type", 0);
 		quad->render(GL_TRIANGLES);
 	}
-
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
@@ -378,6 +387,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
+	
 
 
 	if (show_gbuffer == eShowGBuffer::COLOR)
@@ -873,7 +883,7 @@ void Renderer::showUI()
 {
 	
 	ImGui::Combo("Pipeline", (int*)&pipeline_mode, "FLAT\0FORWARD\0DEFERRED\0", ePipelineMode::PIPELINE_COUNT);
-	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMALMAP\0NORMAL\0DEPTH\0EMISSIVE\0OCCLUSION\0GBUFFERS", eShowGBuffer::GBUFFERS_COUNT);
+	ImGui::Combo("GBuffers", (int*)&show_gbuffer, "NONE\0COLOR\0NORMALMAP\0NORMAL\0DEPTH\0EMISSIVE\0GBUFFERS\0", eShowGBuffer::GBUFFERS_COUNT);
 
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);

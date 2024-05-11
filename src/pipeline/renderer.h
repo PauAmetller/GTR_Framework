@@ -29,7 +29,7 @@ enum eShowGBuffer {
 	NORMAL,
 	DEPTH,
 	EMISSIVE,
-	OCCLUSION,
+	//OCCLUSION,
 	GBUFFERS,
 	GBUFFERS_COUNT
 };
@@ -83,6 +83,8 @@ namespace SCN {
 		std::vector<Renderable> opaqueRenderables;
 		std::vector<Renderable> alphaRenderables;
 		std::vector<LightEntity*> lights; //////////
+		std::vector<LightEntity*> directional_lights; //////////
+		std::vector<LightEntity*> point_and_spot_lights; //////////
 		LightEntity* moon_light; ////////
 
 		//updated every frame

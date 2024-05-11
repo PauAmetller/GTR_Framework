@@ -329,6 +329,7 @@ void main()
 	if(!u_norm_contr){
     		N = perturbNormal(normal, v_world_position, v_uv, normal_pixel);
 	}
+
 	
 	vec3 L;
 
@@ -344,6 +345,7 @@ void main()
 	glFragDepth = depth;
 
 }
+
 
 \light.fs
 
