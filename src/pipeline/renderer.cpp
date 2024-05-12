@@ -331,7 +331,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		glEnable(GL_DEPTH_TEST);
 
-		glDepthFunc(GL_ALWAYS);
+		glDepthFunc(GL_LEQUAL);
 		glDisable(GL_BLEND);
 
 		for (LightEntity* light : lights) {

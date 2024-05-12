@@ -307,7 +307,7 @@ void main()
 {
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
 
-	vec4 color = texture( u_color_texture, uv );
+	vec3 color = texture( u_color_texture, uv ).xyz;
 	
 
 	float depth = texture( u_depth_texture, uv).x;
@@ -317,20 +317,20 @@ void main()
 	if(depth == 1)
 		discard;
 
+	vec3 light = u_ambient_light * occlusion;
+
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-	vec3 light = u_ambient_light * occlusion;
 
+	vec3 L;
 	vec3 normal = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
 	vec3 N = normalize(normal);
 	vec3 normal_pixel = texture(u_normalmap_texture, uv).xyz;
 	if(!u_norm_contr){
     		N = perturbNormal(normal, v_world_position, v_uv, normal_pixel);
 	}
-	
-	vec3 L;
 
 	float NdotL = 0.0;
 	
