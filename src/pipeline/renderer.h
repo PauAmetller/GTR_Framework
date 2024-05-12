@@ -4,7 +4,7 @@
 
 #include "light.h"
 
-#define NUM_SHADOW_MAPS 4
+#define NUM_SHADOW_MAPS 10
 
 //forward declarations
 class Camera;
@@ -66,6 +66,7 @@ namespace SCN {
 		bool white_textures;
 		bool skip_lights;
 		bool skip_shadows;
+		bool skip_alpha_renderables;
 
 		int shadow_map_index;
 		int shadow_map_size;

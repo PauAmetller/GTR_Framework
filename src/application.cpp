@@ -31,7 +31,7 @@ Application::Application()
 
 	//load scene
 	scene = new SCN::Scene();
-	if (!scene->load("data/scene.json"))
+	if (!scene->load("data/scene_benchmark.json"))
 		exit(1);
 
 	camera->lookAt(scene->main_camera.eye, scene->main_camera.center, vec3(0, 1, 0));

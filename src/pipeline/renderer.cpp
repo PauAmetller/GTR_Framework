@@ -42,6 +42,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	white_textures = false;
 	skip_lights = false;
 	skip_shadows = false;
+	skip_alpha_renderables = false;
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
@@ -93,7 +94,8 @@ void Renderer::extractRenderables(SCN::Node* node, Camera* camera) {
 		re.bounding = world_bounding;
 		renderables.push_back(re);
 		if (re.material->alpha_mode == SCN::eAlphaMode::BLEND) {
-			alphaRenderables.push_back(re);
+			if(!skip_alpha_renderables)
+				alphaRenderables.push_back(re);
 		}
 		else {
 			opaqueRenderables.push_back(re);
@@ -378,9 +380,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		deferred_global->disable();
 
 		/*//draw the lights
-		GFX::Mesh* Sphere = new GFX::Mesh;
 		GFX::Shader* deferred_ws = GFX::Shader::Get("deferred_global");
-		Sphere->createSphere(1.0f);
 		assert(deferred_ws);
 		deferred_ws->enable();
 		GbuffersToShader(gbuffers, deferred_ws);
@@ -432,7 +432,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 						printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
 				}
 
-				quad->render(GL_TRIANGLES);
+				sphere->render(GL_TRIANGLES);
 				glEnable(GL_BLEND);
 				glBlendFunc(GL_ONE, GL_ONE);
 				glDisable(GL_DEPTH_TEST);
@@ -454,8 +454,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		deferred_global->disable();
 	}
 
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glEnable(GL_BLEND);
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
@@ -471,6 +471,9 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
+	glDepthMask(GL_TRUE);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
 
 	illumination->unbind();
 
@@ -991,8 +994,8 @@ void Renderer::showUI()
 	ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
 	ImGui::Checkbox("Remove_textures", &white_textures);
 	ImGui::Checkbox("Remove_lights", &skip_lights);
-	ImGui::Checkbox("Remove_shadows", &skip_shadows);
-
+	ImGui::Checkbox("Remove_shadows", &skip_shadows); 
+	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
 
 	// Create a slider for the exponent
 	if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {

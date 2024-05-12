@@ -126,6 +126,84 @@ float computeShadow( vec3 wp){
 
 }
 
+\specullar_function
+
+float GGX(float NdotV, float k){
+	return NdotV / (NdotV * (1.0 - k) + k);
+}
+	
+float G_Smith( float NdotV, float NdotL, float roughness)
+{
+	float k = pow(roughness + 1.0, 2.0) / 8.0;
+	return GGX(NdotL, k) * GGX(NdotV, k);
+}
+
+// Fresnel term with colorized fresnel
+vec3 F_Schlick( const in float VoH, const in vec3 f0)
+{
+	float f = pow(1.0 - VoH, 5.0);
+	return f0 + (vec3(1.0) - f0) * f;
+}
+
+// Normal Distribution Function using GGX Distribution
+float D_GGX (	const in float NoH, const in float linearRoughness )
+{
+	float a2 = linearRoughness * linearRoughness;
+	float f = (NoH * NoH) * (a2 - 1.0) + 1.0;
+	const float PI = 3.14159265359;
+	return a2 / (PI * f * f);
+}
+
+//this is the cook torrance specular reflection model
+vec3 specularBRDF( float roughness, vec3 f0, float NoH, float NoV, float NoL, float LoH )
+{
+	float a = roughness * roughness;
+
+	// Normal Distribution Function
+	float D = D_GGX( NoH, a );
+
+	// Fresnel Function
+	vec3 F = F_Schlick( LoH, f0 );
+
+	// Visibility Function (shadowing/masking)
+	float G = G_Smith( NoV, NoL, roughness );
+		
+	// Norm factor
+	vec3 spec = D * G * F;
+	spec /= (4.0 * NoL * NoV + 1e-6);
+
+	return spec;
+}
+
+\normalmap_functions
+
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
+{
+	// get edge vectors of the pixel triangle
+	vec3 dp1 = dFdx( p );
+	vec3 dp2 = dFdy( p );
+	vec2 duv1 = dFdx( uv );
+	vec2 duv2 = dFdy( uv );
+	
+	// solve the linear system
+	vec3 dp2perp = cross( dp2, N );
+	vec3 dp1perp = cross( N, dp1 );
+	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+ 
+	// construct a scale-invariant frame 
+	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+	return mat3( T * invmax, B * invmax, N );
+}
+
+vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
+{
+	normal_pixel = normal_pixel * 255./127. - 128./127.;
+	mat3 TBN = cotangent_frame(N, WP, uv);
+	return normalize(TBN * normal_pixel);
+}
+
+
 \ComputeLights
 	vec3 light_add;
 	float shadow_factor = 1.0;
@@ -278,31 +356,10 @@ out vec4 FragColor;
 out float glFragDepth;
 
 #include "ComputeShadow"
-mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
-{
-	// get edge vectors of the pixel triangle
-	vec3 dp1 = dFdx( p );
-	vec3 dp2 = dFdy( p );
-	vec2 duv1 = dFdx( uv );
-	vec2 duv2 = dFdy( uv );
-	
-	// solve the linear system
-	vec3 dp2perp = cross( dp2, N );
-	vec3 dp1perp = cross( N, dp1 );
-	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-	// construct a scale-invariant frame 
-	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-	return mat3( T * invmax, B * invmax, N );
-}
 
-vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
-{
-	normal_pixel = normal_pixel * 255./127. - 128./127.;
-	mat3 TBN = cotangent_frame(N, WP, uv);
-	return normalize(TBN * normal_pixel);
-}
+#include "specullar_function"
+
+#include "normalmap_functions"
 
 void main()
 {
@@ -381,34 +438,11 @@ uniform int u_light_type;
 
 out vec4 FragColor;
 
-#include ComputeShadow
+#include "ComputeShadow"
 
-mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
-{
-	// get edge vectors of the pixel triangle
-	vec3 dp1 = dFdx( p );
-	vec3 dp2 = dFdy( p );
-	vec2 duv1 = dFdx( uv );
-	vec2 duv2 = dFdy( uv );
-	
-	// solve the linear system
-	vec3 dp2perp = cross( dp2, N );
-	vec3 dp1perp = cross( N, dp1 );
-	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-	// construct a scale-invariant frame 
-	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-	return mat3( T * invmax, B * invmax, N );
-}
+#include "specullar_function"
 
-vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
-{
-	normal_pixel = normal_pixel * 255./127. - 128./127.;
-	mat3 TBN = cotangent_frame(N, WP, uv);
-	return normalize(TBN * normal_pixel);
-}
-
+#include "normalmap_functions"
 
 void main()
 {
@@ -429,7 +463,7 @@ void main()
 	}
 	float NdotL = 0.0;
 
-	#include ComputeLights
+	#include "ComputeLights"
 
 	light += (NdotL * light_add);
 
