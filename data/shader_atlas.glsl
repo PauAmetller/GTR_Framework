@@ -7,6 +7,7 @@ depth quad.vs depth.fs
 multi basic.vs multi.fs
 gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
+deferred_ws basic.vs deferred_global.fs
 
 \basic.vs
 
@@ -306,16 +307,14 @@ vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
 void main()
 {
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
-
-	vec3 color = texture( u_color_texture, uv ).xyz;
-	
-
 	float depth = texture( u_depth_texture, uv).x;
-	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
-	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 
 	if(depth == 1)
 		discard;
+
+	vec3 color = texture( u_color_texture, uv ).xyz;
+	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
+	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 
 	vec3 light = u_ambient_light * occlusion;
 
@@ -344,6 +343,7 @@ void main()
 	glFragDepth = depth;
 
 }
+
 
 \light.fs
 

@@ -122,6 +122,7 @@ namespace SCN {
 
 		void cameraToShader(Camera* camera, GFX::Shader* shader); //sends camera uniforms to shader
 		void lightToShader(LightEntity* light, GFX::Shader* shader); //sends camera uniforms to shader
+		void GbuffersToShader(GFX::FBO* gbuffers, GFX::Shader* shader); //sends the gbuffers uniforms to shader
 	};
 
 };
