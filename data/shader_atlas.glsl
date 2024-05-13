@@ -440,12 +440,6 @@ void main()
 
 	vec3 light = u_ambient_light * occlusion;
 
-	vec3 color = texture( u_color_texture, uv ).xyz;
-	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
-	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
-
-	vec3 light = u_ambient_light * occlusion;
-
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
