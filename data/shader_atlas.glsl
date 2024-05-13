@@ -502,7 +502,7 @@ void main()
 
 	//ao_factor = pow( ao_factor, 3.0 );
 
-	vec3 light = u_ambient_light * occlusion * ao_factor;
+	vec3 light = u_ambient_light * occlusion;// * ao_factor;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;

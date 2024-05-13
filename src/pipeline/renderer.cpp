@@ -297,6 +297,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	vec2 size = CORE::getWindowSize();
 	GFX::Mesh* quad = GFX::Mesh::getQuad();
+
 	//generear los GBuffers
 	if (!gbuffers)
 	{
@@ -360,6 +361,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	ssao_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	ssao_shader->setUniform3Array("u_points", (float*) & random_points[0], random_points.size());
 	quad->render(GL_TRIANGLES);
+	ssao_shader->disable();
 	ssao_fbo->unbind();
 	ssao_fbo->color_textures[0]->bind();
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -378,28 +380,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (skybox_cubemap)
 		renderSkybox(skybox_cubemap);
 
-	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
-
-	assert(shader);
-	shader->enable();
-	GbuffersToShader(gbuffers, shader);
-
-	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	shader->setUniform("u_emissive_first", vec3(1.0));
-
-	shader->setUniform("u_light_type", 0);
-	quad->render(GL_TRIANGLES);
-
-
-	shader->setUniform("u_emissive_first", vec3(0.0));
-
-	shader->disable();
-	
-	GFX::Shader* deferred_global = GFX::Shader::Get("deferred_global");
-	assert(deferred_global);
-	deferred_global->enable();
 	GFX::Texture* ssao_texture = NULL;
 
 	if (!white_textures) {
@@ -409,13 +389,24 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	if (ssao_texture == NULL)
 		ssao_texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
-	GbuffersToShader(gbuffers, deferred_global);
 
-	deferred_global->setUniform("u_ambient_light", scene->ambient_light);
-	deferred_global->setUniform("u_ao_texture", ssao_texture);
-	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	deferred_global->setUniform("u_emissive_first", vec3(1.0));
+	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
+
+	assert(shader);
+	shader->enable();
+	GbuffersToShader(gbuffers, shader);
+
+	shader->setUniform("u_ambient_light", scene->ambient_light);
+	shader->setUniform("u_ao_texture", ssao_texture);
+	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	shader->setUniform("u_emissive_first", vec3(1.0));
+
+	shader->setUniform("u_light_type", 0);
+	quad->render(GL_TRIANGLES);
+
+	shader->disable();
+	
 
 	if (lights.size() && (!skip_lights)) {
 
