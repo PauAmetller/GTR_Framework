@@ -8,6 +8,7 @@ multi basic.vs multi.fs
 gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
 deferred_ws basic.vs deferred_global.fs
+ssao quad.vs ssao.fs
 
 \basic.vs
 
@@ -378,6 +379,64 @@ void main()
 	FragColor = color;
 }
 
+\ssao.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_normal_texture;
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+uniform float u_radius;
+uniform vec3 u_points[64];
+uniform float u_max_distance;
+
+out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
+	vec3 N = texture( u_normal_texture, v_uv ).xyz * 2.0 - vec3(1.0);
+	N = normalize(N);
+	float depth = texture( u_depth_texture, v_uv).x;
+	if(depth == 1.0)
+		discard;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
+	int num = 64;
+	
+	for(int i = 0; i < 64; ++i)
+	{
+		vec3 random_point = u_points[i];
+
+		//check in which side of the normal
+		if(dot(N,random_point) < 0.0)
+			random_point *= -1.0;
+		//vec3 p = v_world_position + u_points[i] * u_radius;
+		vec3 p = v_world_position + random_point * u_radius;
+		vec4 proj = u_viewprojection * vec4(p, 1.0);
+		proj.xy /= proj.w; //convert to clipspace from homogeneous
+		//apply a tiny bias to its z before converting to clip-space
+		proj.z = (proj.z - 0.005) / proj.w;
+		proj.xyz = proj.xyz * 0.5 + vec3(0.5); //to [0..1]
+
+		//read p true depth
+		float pdepth = texture( u_depth_texture, proj.xy ).x;
+		//compare true depth with its depth
+		if( pdepth < proj.z) //if true depth smaller, is inside
+			num--; //remove this point from the list of visible
+	}
+
+	float ao = float(num) / 64.0;
+	FragColor = vec4(ao, ao, ao, 1.0); 
+}
+
 \deferred_global.fs
 
 #version 330 core
@@ -392,6 +451,7 @@ uniform sampler2D u_normal_texture;
 uniform sampler2D u_depth_texture;
 uniform sampler2D u_emissive_occlusion_texture;
 //uniform sampler2D u_normalmap_texture;
+uniform sampler2D u_ao_texture;
 
 uniform vec3 u_ambient_light;
 
@@ -438,7 +498,11 @@ void main()
 	float metalness = GB0.a;
 	float roughness = GB1.a;
 
-	vec3 light = u_ambient_light * occlusion;
+	float ao_factor = texture( u_ao_texture, uv ).x;
+
+	//ao_factor = pow( ao_factor, 3.0 );
+
+	vec3 light = u_ambient_light * occlusion * ao_factor;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
