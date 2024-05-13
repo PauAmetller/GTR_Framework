@@ -96,7 +96,8 @@ void Renderer::extractRenderables(SCN::Node* node, Camera* camera) {
 		re.bounding = world_bounding;
 		renderables.push_back(re);
 		if (re.material->alpha_mode == SCN::eAlphaMode::BLEND) {
-			alphaRenderables.push_back(re);
+			if(!skip_alpha_renderables)
+				alphaRenderables.push_back(re);
 		}
 		else {
 			opaqueRenderables.push_back(re);
