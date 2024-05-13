@@ -7,6 +7,7 @@ depth quad.vs depth.fs
 multi basic.vs multi.fs
 gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
+deferred_ws basic.vs deferred_global.fs
 
 \basic.vs
 
@@ -125,13 +126,116 @@ float computeShadow( vec3 wp){
 
 }
 
+\specullar_function
+
+float GGX(float NdotV, float k){
+	return NdotV / (NdotV * (1.0 - k) + k);
+}
+	
+float G_Smith( float NdotV, float NdotL, float roughness)
+{
+	float k = pow(roughness + 1.0, 2.0) / 8.0;
+	return GGX(NdotL, k) * GGX(NdotV, k);
+}
+
+// Fresnel term with scalar optimization(f90=1)
+float F_Schlick( const in float VoH, const in float f0)
+{
+	float f = pow(1.0 - VoH, 5.0);
+	return f0 + (1.0 - f0) * f;
+}
+
+// Fresnel term with colorized fresnel
+vec3 F_Schlick( const in float VoH, const in vec3 f0)
+{
+	float f = pow(1.0 - VoH, 5.0);
+	return f0 + (vec3(1.0) - f0) * f;
+}
+
+#define RECIPROCAL_PI 0.3183098861837697
+#define PI 3.14159265359
+
+vec3 Fd_Lambert(vec3 color) {
+    return color/PI;
+}
+
+// Diffuse Reflections: Disney BRDF using retro-reflections using F term, this is much more complex!!
+float Fd_Burley ( const in float NoV, const in float NoL,const in float LoH, const in float linearRoughness)
+{
+        float f90 = 0.5 + 2.0 * linearRoughness * LoH * LoH;
+        float lightScatter = F_Schlick(NoL, 1.0);//, f90);  //Check latter
+        float viewScatter  = F_Schlick(NoV, 1.0);//, f90);
+        return lightScatter * viewScatter * RECIPROCAL_PI;
+}
+
+// Normal Distribution Function using GGX Distribution
+float D_GGX (	const in float NoH, const in float linearRoughness )
+{
+	float a2 = linearRoughness * linearRoughness;
+	float f = (NoH * NoH) * (a2 - 1.0) + 1.0;
+	return a2 / (PI * f * f);
+}
+
+//this is the cook torrance specular reflection model
+vec3 specularBRDF( float roughness, vec3 f0, float NoH, float NoV, float NoL, float LoH )
+{
+	float a = roughness * roughness;
+
+	// Normal Distribution Function
+	float D = D_GGX( NoH, a );
+
+	// Fresnel Function
+	vec3 F = F_Schlick( LoH, f0 );
+
+	// Visibility Function (shadowing/masking)
+	float G = G_Smith( NoV, NoL, roughness );
+		
+	// Norm factor
+	vec3 spec = D * G * F;
+	spec /= (4.0 * NoL * NoV + 1e-6);
+
+	return spec;
+}
+
+\normalmap_functions
+
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
+{
+	// get edge vectors of the pixel triangle
+	vec3 dp1 = dFdx( p );
+	vec3 dp2 = dFdy( p );
+	vec2 duv1 = dFdx( uv );
+	vec2 duv2 = dFdy( uv );
+	
+	// solve the linear system
+	vec3 dp2perp = cross( dp2, N );
+	vec3 dp1perp = cross( N, dp1 );
+	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+ 
+	// construct a scale-invariant frame 
+	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+	return mat3( T * invmax, B * invmax, N );
+}
+
+vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
+{
+	normal_pixel = normal_pixel * 255./127. - 128./127.;
+	mat3 TBN = cotangent_frame(N, WP, uv);
+	return normalize(TBN * normal_pixel);
+}
+
+
 \ComputeLights
+
 	vec3 light_add;
+	float NoL;
 	float shadow_factor = 1.0;
 	if ( u_light_type == DIRECTIONALLIGHT)
 	{
 		L = u_light_front;
-		NdotL = clamp( dot(N,L), 0.0, 1.0 );
+		NoL = dot(N,L);
+		NdotL = clamp( NoL, 0.0, 1.0 );
 		light_add = u_light_color;
 		if(u_light_cast_shadow == 1)
 			shadow_factor = computeShadow(v_world_position);
@@ -142,7 +246,12 @@ float computeShadow( vec3 wp){
 		float dist = length(L);
 		L = L / dist; 
 		vec3 L = normalize(L);
-		NdotL = clamp( dot(N,L), 0.0, 1.0 );
+		NoL = dot(N,L);
+		NdotL = clamp( NoL, 0.0, 1.0 );
+
+		float att_factor = u_light_max_distance - dist;
+		att_factor /= u_light_max_distance;
+		att_factor = max(att_factor, 0.0);
 
 		float min_angle_cos = u_light_cone_info.y;
 		float max_angle_cos = u_light_cone_info.x;
@@ -151,22 +260,43 @@ float computeShadow( vec3 wp){
 			vec3 D = normalize(u_light_front);
 			float cos_angle = dot( D, L );
 			if( cos_angle < min_angle_cos  ){
-	 			NdotL = 0.0;
+	 			att_factor = 0.0;
 			} else if ( cos_angle < max_angle_cos) {
-				NdotL *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
+				att_factor *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
 			}
 			if(u_light_cast_shadow == 1)
 				shadow_factor = computeShadow(v_world_position);
 		}
 
-		float att_factor = u_light_max_distance - dist;
-		att_factor /= u_light_max_distance;
-		att_factor = max(att_factor, 0.0);
 		
 		light_add = u_light_color * att_factor;
 	} 
-	light_add *= shadow_factor * NdotL;
+	
+	vec3 H = normalize(V + L);
+	float NoH = dot(N, H);
+	float NoV = dot(N, V);
+	float LoH = dot(L, H);
 
+	//we compute the reflection in base to the color and the metalness
+	vec3 f0 = mix( vec3(0.5), color.xyz, metalness );
+
+	//metallic materials do not have diffuse
+	vec3 diffuseColor = (1.0 - metalness) * color.xyz;
+
+	//compute the specular
+	vec3 Fr_d = specularBRDF(roughness, f0, NoH, NoV, NoL, LoH); 
+
+	// Here we use the Burley, but you can replace it by the Lambert.
+	float linearRoughness = roughness * roughness;
+	//vec3 Fd_d = diffuseColor * Fd_Lambert(color.xyz); 
+	vec3 Fd_d = diffuseColor * Fd_Burley(NoV,NoL,LoH,linearRoughness); 
+	
+	//add diffuse and specular reflection
+	vec3 direct = Fr_d + Fd_d;
+	if (u_PBR == 0){
+		direct = vec3(1.0);
+	}
+	light_add *= shadow_factor * NdotL * direct;
 
 
 \gbuffers.fs
@@ -187,11 +317,14 @@ uniform sampler2D u_texture_occlusion;
 uniform float u_time;
 uniform float u_alpha_cutoff;
 uniform vec3 u_emissive_factor;
+uniform bool u_norm_contr;
 
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec4 NormalColor;
 layout(location = 2) out vec4 EmissiveOcclusion;
-layout(location = 3) out vec4 NormalMap;
+layout(location = 3) out vec4 ExtraColor;
+
+#include "normalmap_functions"
 
 void main()
 {
@@ -201,14 +334,19 @@ void main()
 	
 	if(color.a < u_alpha_cutoff)
 		discard;
-
+	
 	vec3 N = normalize(v_normal);
+	vec3 normal_pixel = texture( u_texture_normalmap, uv ).xyz;
+	if(!u_norm_contr){
+    		N = perturbNormal(v_normal, v_world_position, v_uv, normal_pixel);
+	}
 
 	FragColor = vec4(color.xyz, texture( u_texture_metallic_roughness, uv ).z);
-	NormalColor = vec4(N * 0.5 + vec3(0.5),1.0);
+	NormalColor = vec4(N * 0.5 + vec3(0.5), texture( u_texture_metallic_roughness, uv ).y);
 
 	EmissiveOcclusion = vec4(texture( u_texture_emissive, uv ).xyz * u_emissive_factor, texture( u_texture_occlusion, uv ).x);
-	NormalMap = vec4(texture( u_texture_normalmap, uv ).xyz, texture( u_texture_metallic_roughness, uv ).y);
+
+	ExtraColor = vec4(fract(v_world_position), 1.0);
 } 
 
 \texture.fs
@@ -247,13 +385,13 @@ void main()
 in vec3 v_position;
 in vec2 v_uv;
 in vec3 v_world_position;
-//in vec3 v_normal;
+in vec3 v_normal;
 
 uniform sampler2D u_color_texture;
 uniform sampler2D u_normal_texture;
 uniform sampler2D u_depth_texture;
 uniform sampler2D u_emissive_occlusion_texture;
-uniform sampler2D u_normalmap_texture;
+//uniform sampler2D u_normalmap_texture;
 
 uniform vec3 u_ambient_light;
 
@@ -264,10 +402,12 @@ uniform vec3 u_light_front;
 uniform vec2 u_light_cone_info;
 uniform float u_light_max_distance;
 uniform vec3 u_emissive_first;
-uniform bool u_norm_contr;
 
 uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
+uniform vec3 u_camera_pos;
+
+uniform int u_PBR;
 
 #define POINTLIGHT 1
 #define SPOTLIGHT 2
@@ -277,61 +417,39 @@ out vec4 FragColor;
 out float glFragDepth;
 
 #include "ComputeShadow"
-mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
-{
-	// get edge vectors of the pixel triangle
-	vec3 dp1 = dFdx( p );
-	vec3 dp2 = dFdy( p );
-	vec2 duv1 = dFdx( uv );
-	vec2 duv2 = dFdy( uv );
-	
-	// solve the linear system
-	vec3 dp2perp = cross( dp2, N );
-	vec3 dp1perp = cross( N, dp1 );
-	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-	// construct a scale-invariant frame 
-	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-	return mat3( T * invmax, B * invmax, N );
-}
 
-vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
-{
-	normal_pixel = normal_pixel * 255./127. - 128./127.;
-	mat3 TBN = cotangent_frame(N, WP, uv);
-	return normalize(TBN * normal_pixel);
-}
+#include "specullar_function"
+
+#include "normalmap_functions"
 
 void main()
 {
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
-
-	vec4 color = texture( u_color_texture, uv );
-	
-
 	float depth = texture( u_depth_texture, uv).x;
+
+	if(depth == 1.0)
+		discard;
+
+	vec4 GB0 = texture( u_color_texture, uv );
+	vec4 GB1 = texture( u_normal_texture, uv );
 	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
 	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
+	vec3 color = GB0.xyz;
+	float metalness = GB0.a;
+	float roughness = GB1.a;
 
-	if(depth == 1)
-		discard;
+	vec3 light = u_ambient_light * occlusion;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-	vec3 light = u_ambient_light * occlusion;
 
-	vec3 normal = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
-	vec3 N = normalize(normal);
-	vec3 normal_pixel = texture(u_normalmap_texture, uv).xyz;
-	if(!u_norm_contr){
-    		N = perturbNormal(normal, v_world_position, v_uv, normal_pixel);
-	}
-
-	
 	vec3 L;
+	vec3 normal = GB1.xyz * 2.0 - vec3(1.0);
+	vec3 N = normalize(normal);
+	
+	vec3 V = normalize(u_camera_pos - v_world_position);
 
 	float NdotL = 0.0;
 	
@@ -366,6 +484,7 @@ uniform sampler2D u_texture_metallic_roughness; //Still not used
 uniform float u_time;
 uniform float u_alpha_cutoff;
 uniform bool u_norm_contr;
+uniform vec3 u_camera_pos;
 
 uniform vec3 u_ambient_light;
 uniform vec3 u_emissive_factor;
@@ -376,6 +495,7 @@ uniform float u_light_max_distance;
 uniform vec2 u_light_cone_info;
 
 uniform int u_light_type;
+uniform int u_PBR;
 
 #define POINTLIGHT 1
 #define SPOTLIGHT 2
@@ -383,40 +503,20 @@ uniform int u_light_type;
 
 out vec4 FragColor;
 
-#include ComputeShadow
+#include "ComputeShadow"
 
-mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
-{
-	// get edge vectors of the pixel triangle
-	vec3 dp1 = dFdx( p );
-	vec3 dp2 = dFdy( p );
-	vec2 duv1 = dFdx( uv );
-	vec2 duv2 = dFdy( uv );
-	
-	// solve the linear system
-	vec3 dp2perp = cross( dp2, N );
-	vec3 dp1perp = cross( N, dp1 );
-	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-	// construct a scale-invariant frame 
-	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-	return mat3( T * invmax, B * invmax, N );
-}
+#include "specullar_function"
 
-vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
-{
-	normal_pixel = normal_pixel * 255./127. - 128./127.;
-	mat3 TBN = cotangent_frame(N, WP, uv);
-	return normalize(TBN * normal_pixel);
-}
-
+#include "normalmap_functions"
 
 void main()
 {
 	vec2 uv = v_uv;
 	vec4 color = u_color;
 	color *= texture( u_texture_albedo, v_uv );
+	
+	float metalness = texture(u_texture_metallic_roughness, v_uv).z;
+	float roughness = texture(u_texture_metallic_roughness, v_uv).y;
 
 	if(color.a < u_alpha_cutoff)
 		discard;
@@ -430,8 +530,9 @@ void main()
     		N = perturbNormal(v_normal, v_world_position, v_uv, normal);
 	}
 	float NdotL = 0.0;
+	vec3 V = normalize(u_camera_pos - v_world_position);
 
-	#include ComputeLights
+	#include "ComputeLights"
 
 	light += (NdotL * light_add);
 
@@ -441,7 +542,6 @@ void main()
 	
 	FragColor = final_color;
 }
-
 
 
 \skybox.fs

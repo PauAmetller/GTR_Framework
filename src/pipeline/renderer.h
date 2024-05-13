@@ -4,7 +4,7 @@
 
 #include "light.h"
 
-#define NUM_SHADOW_MAPS 4
+#define NUM_SHADOW_MAPS 10
 
 //forward declarations
 class Camera;
@@ -25,11 +25,10 @@ enum ePipelineMode {
 enum eShowGBuffer {
 	NONE,
 	COLOR,
-	NORMALMAP,
 	NORMAL,
-	DEPTH,
 	EMISSIVE,
-	//OCCLUSION,
+	DEPTH,
+	EXTRA,
 	GBUFFERS,
 	GBUFFERS_COUNT
 };
@@ -66,6 +65,8 @@ namespace SCN {
 		bool white_textures;
 		bool skip_lights;
 		bool skip_shadows;
+		bool skip_alpha_renderables;
+		bool Remove_PBR;
 
 		int shadow_map_index;
 		int shadow_map_size;
@@ -124,6 +125,7 @@ namespace SCN {
 
 		void cameraToShader(Camera* camera, GFX::Shader* shader); //sends camera uniforms to shader
 		void lightToShader(LightEntity* light, GFX::Shader* shader); //sends camera uniforms to shader
+		void GbuffersToShader(GFX::FBO* gbuffers, GFX::Shader* shader); //sends the gbuffers uniforms to shader
 	};
 
 };
