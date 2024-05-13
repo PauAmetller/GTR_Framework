@@ -416,7 +416,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	deferred_global->setUniform("u_emissive_first", vec3(1.0));
-	deferred_global->setUniform("u_norm_contr", normalMap_texture);
 
 	if (lights.size() && (!skip_lights)) {
 
