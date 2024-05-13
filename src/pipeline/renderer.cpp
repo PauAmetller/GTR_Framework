@@ -45,11 +45,8 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	skip_lights = false;
 	skip_shadows = false;
 	skip_alpha_renderables = false;
-<<<<<<< Updated upstream
 	Remove_PBR = true;
-=======
 	show_ssao = false;
->>>>>>> Stashed changes
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
@@ -381,10 +378,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (skybox_cubemap)
 		renderSkybox(skybox_cubemap);
 
-
-	//draw the lights
-<<<<<<< Updated upstream
-	GFX::Mesh* quad = GFX::Mesh::getQuad();
 	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
 
 	assert(shader);
@@ -403,7 +396,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	shader->setUniform("u_emissive_first", vec3(0.0));
 
 	shader->disable();
-=======
 	
 	GFX::Shader* deferred_global = GFX::Shader::Get("deferred_global");
 	assert(deferred_global);
@@ -425,7 +417,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	deferred_global->setUniform("u_emissive_first", vec3(1.0));
 	deferred_global->setUniform("u_norm_contr", normalMap_texture);
->>>>>>> Stashed changes
 
 	if (lights.size() && (!skip_lights)) {
 
@@ -1118,12 +1109,8 @@ void Renderer::showUI()
 	ImGui::Checkbox("Remove_lights", &skip_lights);
 	ImGui::Checkbox("Remove_shadows", &skip_shadows);
 	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
-<<<<<<< Updated upstream
-	ImGui::Checkbox("Remove_PBR", &Remove_PBR);
 
-=======
-	
->>>>>>> Stashed changes
+	ImGui::Checkbox("Remove_PBR", &Remove_PBR);
 
 	// Create a slider for the exponent
 	if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {

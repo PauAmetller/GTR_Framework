@@ -508,7 +508,6 @@ void main()
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-
 	vec3 L;
 	vec3 normal = GB1.xyz * 2.0 - vec3(1.0);
 	vec3 N = normalize(normal);
