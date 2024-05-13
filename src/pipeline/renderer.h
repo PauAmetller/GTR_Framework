@@ -66,7 +66,13 @@ namespace SCN {
 		bool skip_lights;
 		bool skip_shadows;
 		bool skip_alpha_renderables;
+<<<<<<< Updated upstream
 		bool Remove_PBR;
+=======
+		bool show_ssao;
+
+		float ssao_max_distance;
+>>>>>>> Stashed changes
 
 		int shadow_map_index;
 		int shadow_map_size;
@@ -87,6 +93,8 @@ namespace SCN {
 		std::vector<LightEntity*> directional_lights; //////////
 		std::vector<LightEntity*> point_and_spot_lights; //////////
 		LightEntity* moon_light; ////////
+
+		float ssao_radius;
 
 		//updated every frame
 		Renderer(const char* shaders_atlas_filename );

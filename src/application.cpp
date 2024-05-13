@@ -13,6 +13,7 @@ float cam_speed = 25;
 
 SceneEditor* editor = nullptr;
 
+
 Application::Application()
 {
 	instance = this;
@@ -52,6 +53,14 @@ Application::Application()
 
 	//hide the cursor
 	CORE::showCursor(!mouse_locked); //hide or show the mouse
+
+	//for (int i = 0; i < 100; i++)
+	//{
+	//	//vec3 v(random(), random(), random()); //puntos en la superficie de un 8o de esfera
+	//	vec3 v(random() - 0.5, random() - 0.5, random() - 0.5); //puntos en la superficie de una esfera
+	//	v.normalize(); 
+	//	random_points.push_back(v * 10.0f);
+	//}
 }
 
 //what to do when the image has to be draw
@@ -63,6 +72,7 @@ void Application::render(void)
 	//set the camera as default (used by some functions in the framework)
 	camera->enable();
 
+	//GFX::drawPoints(random_points, Vector4f(1, 1, 0, 1), 2);
 	//render the whole scene
 	renderer->renderScene(scene, camera);
 	

@@ -421,6 +421,8 @@ inline float random(float range = 1.0f, int offset = 0) { return ((rand() % 1000
 std::ostream& operator << (std::ostream& os, const Vector3f& v);
 std::ostream& operator << (std::ostream& os, const Vector4f& v);
 
+std::vector<Vector3f> generateSpherePoints(int num, float radius, bool hemi);
+
 //generic types
 
 typedef Vector2f vec2;

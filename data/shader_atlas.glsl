@@ -8,6 +8,7 @@ multi basic.vs multi.fs
 gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
 deferred_ws basic.vs deferred_global.fs
+ssao quad.vs ssao.fs
 
 \basic.vs
 
@@ -445,6 +446,7 @@ void main()
 	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 
 	vec3 light = u_ambient_light * occlusion;
+	float ao_factor = texture( u_ao_texture, uv ).x;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;

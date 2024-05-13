@@ -27,6 +27,8 @@ GFX::Mesh cube;
 
 GFX::FBO* gbuffers = nullptr;
 GFX::FBO* illumination = nullptr;
+GFX::FBO* ssao_fbo = nullptr;
+std::vector<vec3> random_points;
 
 
 Renderer::Renderer(const char* shader_atlas_filename)
@@ -43,7 +45,11 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	skip_lights = false;
 	skip_shadows = false;
 	skip_alpha_renderables = false;
+<<<<<<< Updated upstream
 	Remove_PBR = true;
+=======
+	show_ssao = false;
+>>>>>>> Stashed changes
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
@@ -63,6 +69,12 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	for (int i = 0; i < NUM_SHADOW_MAPS; i++) {
 		shadow_maps[i] = nullptr;
 	}
+
+	ssao_radius = 1.0;
+	ssao_max_distance = 10.0f;
+	random_points = generateSpherePoints(64, 1, false);
+
+
 }
 
 
@@ -287,7 +299,7 @@ void Renderer::renderSceneForward(SCN::Scene* scene, Camera* camera)
 void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	vec2 size = CORE::getWindowSize();
-
+	GFX::Mesh* quad = GFX::Mesh::getQuad();
 	//generear los GBuffers
 	if (!gbuffers)
 	{
@@ -319,6 +331,41 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	gbuffers->unbind();
 
+	//ssao
+
+	if (!ssao_fbo)
+	{
+		ssao_fbo = new GFX::FBO();
+		ssao_fbo->create(size.x, size.y ,1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_fbo->color_textures[0]->setName("SSAO");
+	}
+	ssao_fbo->bind();
+	glClearColor(1, 1, 1, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+	//disable using mipmaps
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	//enable bilinear filtering
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+
+	GFX::Shader* ssao_shader = GFX::Shader::Get("ssao");
+
+	assert(ssao_shader);
+	ssao_shader->enable();
+	ssao_shader->setUniform("u_radius", ssao_radius);
+	ssao_shader->setUniform("u_max_distance", ssao_max_distance);
+	ssao_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 0);
+	ssao_shader->setUniform("u_iRes", vec2(1.0 / ssao_fbo->color_textures[0]->width, 1.0 / ssao_fbo->color_textures[0]->height));
+	ssao_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	ssao_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	ssao_shader->setUniform3Array("u_points", (float*) & random_points[0], random_points.size());
+	quad->render(GL_TRIANGLES);
+	ssao_fbo->unbind();
+	ssao_fbo->color_textures[0]->bind();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	illumination->bind();
 	camera->enable();
@@ -336,6 +383,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 
 	//draw the lights
+<<<<<<< Updated upstream
 	GFX::Mesh* quad = GFX::Mesh::getQuad();
 	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
 
@@ -355,6 +403,29 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	shader->setUniform("u_emissive_first", vec3(0.0));
 
 	shader->disable();
+=======
+	
+	GFX::Shader* deferred_global = GFX::Shader::Get("deferred_global");
+	assert(deferred_global);
+	deferred_global->enable();
+	GFX::Texture* ssao_texture = NULL;
+
+	if (!white_textures) {
+		if (!ssao_texture)
+			ssao_texture = ssao_fbo->color_textures[0];
+	}
+
+	if (ssao_texture == NULL)
+		ssao_texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+	GbuffersToShader(gbuffers, deferred_global);
+
+	deferred_global->setUniform("u_ambient_light", scene->ambient_light);
+	deferred_global->setUniform("u_ao_texture", ssao_texture);
+	deferred_global->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+	deferred_global->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	deferred_global->setUniform("u_emissive_first", vec3(1.0));
+	deferred_global->setUniform("u_norm_contr", normalMap_texture);
+>>>>>>> Stashed changes
 
 	if (lights.size() && (!skip_lights)) {
 
@@ -537,7 +608,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		gbuffers->color_textures[2]->toViewport();
 	if (show_gbuffer == eShowGBuffer::EXTRA)
 		gbuffers->color_textures[3]->toViewport();
-	if (show_gbuffer == eShowGBuffer::DEPTH)  //Needs to be done use the depth shader
+	if (show_gbuffer == eShowGBuffer::DEPTH)  
 	{
 		GFX::Shader* depth_shader = GFX::Shader::Get("depth");
 		depth_shader->enable();
@@ -567,6 +638,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		glViewport(0, 0, size.x, size.y);
 
 	}
+	if(show_ssao)
+		ssao_fbo->color_textures[0]->toViewport();
 }
 
 
@@ -1045,8 +1118,12 @@ void Renderer::showUI()
 	ImGui::Checkbox("Remove_lights", &skip_lights);
 	ImGui::Checkbox("Remove_shadows", &skip_shadows);
 	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
+<<<<<<< Updated upstream
 	ImGui::Checkbox("Remove_PBR", &Remove_PBR);
 
+=======
+	
+>>>>>>> Stashed changes
 
 	// Create a slider for the exponent
 	if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
@@ -1055,6 +1132,10 @@ void Renderer::showUI()
 	}
 	// Display the actual shadowmap size
 	ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
+
+	ImGui::Checkbox("Show SSAO", &show_ssao);
+	ImGui::DragFloat("SSAO Radius", &ssao_radius, 0.01f, 0.0f);
+	ImGui::DragFloat("SSAO Max Distance", &ssao_max_distance, 0.01f, 0.0f);
 }
 
 #else
