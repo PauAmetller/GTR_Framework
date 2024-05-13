@@ -450,12 +450,9 @@ uniform sampler2D u_color_texture;
 uniform sampler2D u_normal_texture;
 uniform sampler2D u_depth_texture;
 uniform sampler2D u_emissive_occlusion_texture;
-<<<<<<< Updated upstream
 //uniform sampler2D u_normalmap_texture;
-=======
 uniform sampler2D u_normalmap_texture;
 uniform sampler2D u_ao_texture;
->>>>>>> Stashed changes
 
 uniform vec3 u_ambient_light;
 
@@ -496,19 +493,13 @@ void main()
 
 	vec4 GB0 = texture( u_color_texture, uv );
 	vec4 GB1 = texture( u_normal_texture, uv );
-	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
-	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 	vec3 color = GB0.xyz;
 	float metalness = GB0.a;
 	float roughness = GB1.a;
 
-	vec3 light = u_ambient_light * occlusion;
-
-	vec3 color = texture( u_color_texture, uv ).xyz;
 	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
 	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
 
-	vec3 light = u_ambient_light * occlusion;
 	float ao_factor = texture( u_ao_texture, uv ).x;
 
 	//ao_factor = pow( ao_factor, 3.0 );
@@ -518,7 +509,6 @@ void main()
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
-
 
 	vec3 L;
 	vec3 normal = GB1.xyz * 2.0 - vec3(1.0);
