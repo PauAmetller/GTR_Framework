@@ -45,7 +45,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	skip_lights = false;
 	skip_shadows = false;
 	skip_alpha_renderables = false;
-	Remove_PBR = true;
+	Remove_PBR = false;
 	show_ssao = false;
 	scene = nullptr;
 	skybox_cubemap = nullptr;
@@ -425,6 +425,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		glDepthFunc(GL_LESS);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
+		glEnable(GL_CULL_FACE);
 
 		shadow_map_index = 0;
 		for (LightEntity* light : lights) {
@@ -434,7 +435,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
 				shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
 				shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-				shader->setUniform("u_shadow_bias", light->shadow_bias);
+				shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
 				if (shadow_map_index < NUM_SHADOW_MAPS - 1)
 					shadow_map_index++;
 				else
@@ -454,7 +455,9 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				m.scale(light->max_distance, light->max_distance, light->max_distance);
 				shader->setUniform("u_model", m);
 				glFrontFace(GL_CW);
+				glEnable(GL_CULL_FACE);
 				sphere.render(GL_TRIANGLES);
+				glDisable(GL_CULL_FACE);
 				glFrontFace(GL_CCW);
 			}
 		}
@@ -470,6 +473,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		glDepthFunc(GL_ALWAYS);
 		glEnable(GL_BLEND);
+		glEnable(GL_CULL_FACE);
+
+		shader->setUniform("u_ambient_light", vec3(0.0));
+		shader->setUniform("u_emissive_first", vec3(1.0));
 
 		shadow_map_index = 0;
 		if (directional_lights.size()) {
@@ -481,7 +488,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 					shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
 					shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
 					shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-					shader->setUniform("u_shadow_bias", light->shadow_bias);
+					shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
 					if (shadow_map_index < NUM_SHADOW_MAPS - 1)
 						shadow_map_index++;
 					else
@@ -489,7 +496,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				}
 
 				quad->render(GL_TRIANGLES);
-				shader->setUniform("u_ambient_light", vec3(0.0));
 			}
 
 			glDisable(GL_BLEND);
@@ -534,7 +540,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 					shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
 					shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
 					shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-					shader->setUniform("u_shadow_bias", light->shadow_bias);
+					shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
 					if (shadow_map_index < NUM_SHADOW_MAPS - 1)
 						shadow_map_index++;
 					else
@@ -1057,7 +1063,6 @@ void SCN::Renderer::cameraToShader(Camera* camera, GFX::Shader* shader)
 {
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix );
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_PBR", !Remove_PBR ? 1 : 0);  //Move somewhere else
 }
 
 void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader) 
@@ -1068,6 +1073,7 @@ void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader)
 	shader->setUniform("u_light_max_distance", light->max_distance);
 	shader->setUniform("u_light_cone_info", vec2(cos(light->cone_info.x * DEG2RAD), cos(light->cone_info.y * DEG2RAD)));
 	shader->setUniform("u_light_front", light->root.model.frontVector().normalize());
+	shader->setUniform("u_PBR", !Remove_PBR ? 1 : 0);
 }
 
 void SCN::Renderer::GbuffersToShader(GFX::FBO* gbuffers, GFX::Shader* shader) {

@@ -235,8 +235,7 @@ vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
 	if ( u_light_type == DIRECTIONALLIGHT)
 	{
 		L = u_light_front;
-		NoL = dot(N,L);
-		NdotL = clamp( NoL, 0.0, 1.0 );
+		NdotL = clamp( dot(N,L), 0.0, 1.0 );
 		light_add = u_light_color;
 		if(u_light_cast_shadow == 1)
 			shadow_factor = computeShadow(v_world_position);
@@ -247,8 +246,7 @@ vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
 		float dist = length(L);
 		L = L / dist; 
 		vec3 L = normalize(L);
-		NoL = dot(N,L);
-		NdotL = clamp( NoL, 0.0, 1.0 );
+		NdotL = clamp( dot(N,L), 0.0, 1.0 );
 
 		float att_factor = u_light_max_distance - dist;
 		att_factor /= u_light_max_distance;
@@ -274,9 +272,10 @@ vec3 perturbNormal(vec3 N, vec3 WP, vec2 uv, vec3 normal_pixel)
 	} 
 	
 	vec3 H = normalize(V + L);
-	float NoH = dot(N, H);
-	float NoV = dot(N, V);
-	float LoH = dot(L, H);
+	NoL = NdotL;
+	float NoH = clamp( dot(N, H), 0.0, 1.0 );
+	float NoV = clamp( dot(N, V), 0.0, 1.0 );
+	float LoH = clamp( dot(L, H), 0.0, 1.0 );
 
 	//we compute the reflection in base to the color and the metalness
 	vec3 f0 = mix( vec3(0.5), color.xyz, metalness );
