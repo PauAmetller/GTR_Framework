@@ -1,5 +1,5 @@
 ORIOL SOLER GONZALEZ 255525 oriol.soler02@estudiant.upf.edu
-PAU AMETLLER
+PAU AMETLLER LÓPEZ 254537 pau.ametller01@estudiant.upf.edu
 
 
 --- GTR ASSIGNMENT 2 ---
@@ -11,10 +11,10 @@ al que ja teníem (Forward), hem renderitzat l'escena amb totes les textures pr�
 utilitzat GBuffers per guardar les textures en un sol objecte. Al voler tenir totes
 les textures en un sol GBuffer, hem necessitat crear un 4 component d'aquest i al final
 hem distribuït el GBuffer de forma que:
-0 - Color.xyz + Metal Roughness.z
-1 - NormalColor + Metal Roughness.y
-2 - Emissive.xyz + Occlusion.x
-3 - Extra Color
+0 - Color.xyz + Metal Roughness.z     (Color + metalness)
+1 - NormalColor + Metal Roughness.y   (Normal(Normalmap applied) + roughness)
+2 - Emissive.xyz + Occlusion.x        (Emissive + Occlusion)
+3 - Extra Color                       (Fractioned world position)
 Es poden consultar aquestes textures en el menú de GBuffers de l'editor i jugar amb treure i posar 
 textures i llums des dels desplegables de Texture Options i Light Options.
 
@@ -25,7 +25,12 @@ mateix cotxe. Per les llums, estàvem creant quads a pantalla completa per a cad
 així que pels spots i pointlights hem construït esferes on només a dintre es realitzaran
 els càlculs per a aquestes llums.
 
-EXPLICAR PBR
+Pel PBR hem calculat el V (vector towards the eye) i H (half vector between V and L), juntament amb la
+L (vector toward the light) i la N (normal vector at the point), les qual ja haviem obtingut previament 
+per calcular la llum, hem fet els seus dot products i applicat les formules proporcionades a les slides.
+Poden observar que tot i que enfosqueix la scena, ja que fa que només reflexi una part de la llum depenent
+de les propietats del material, fa que algun objectes metallics com els retrovisors es noti un llum molt 
+més realista.
 
 Després, hem aplicat l'algoritme del SSAO per poder afegir una ambient oclusion més
 fidel a l'escena. Per fer això, ens centrem a generar punts aleatoris dintre d'una esfera,
@@ -48,7 +53,10 @@ la opció de Kernel Size (amb un màxim de 5). Aquesta opció l'hem desenvolupad
 que a partir d'una textura i un kernel de AxA, té en compte els píxels del kernel per amitjanar el pixel central
 a partir d'uns pesos amb distribució gaussiana.
 
-EXPLICAR GAMMA
+Hem pasat les textures que contenien colors com la color i emissive, the gamma a linear la començament del
+fragment shader i hem retornat el color resultant a gamma abans de retornar el FragColor.
 
-EXPLICAR HDR I TONEMAPPER
+Després, hem applicat el tonemapper el qual té un menú desplegable en la pestanya del rendering desde on
+es pot activar o desactivar, i modificar els parametres per aconseguir una escena més semblan a com 
+nosaltres persebriem la realitat. 
 
