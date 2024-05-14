@@ -54,6 +54,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
+	deactivate_tonemapper = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -72,6 +73,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 		shadow_maps[i] = nullptr;
 	}
 
+
 	ssao_radius = 5.0;
 	ssao_max_distance = 1.0f;
 	ssao_linear = 2.2f;
@@ -79,6 +81,12 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	kernel_size = 5;
 	sigma = 1.0f;
 	weights = calculate_weights(kernel_size, sigma);
+
+	//Tonemapper
+	scale = 1.0;
+	average_lum = 1.0;
+	lumwhite2 = 1.0;
+	igamma = 1.0;
 }
 
 
@@ -315,6 +323,25 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		illumination = new GFX::FBO();
 		illumination->create(size.x, size.y, 1, GL_RGBA, GL_FLOAT, true);
 	}
+
+	//ssao
+
+	if (!ssao_fbo || (ssao_fbo->width != size.x || ssao_fbo->height != size.y))
+	{
+		ssao_fbo = new GFX::FBO();
+		//ssao_fbo->create(size.x / 2.0, size.y / 2.0, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_fbo->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_fbo->color_textures[0]->setName("SSAO");
+	}
+
+	if (!ssao_blurr || (ssao_blurr->width != size.x || ssao_blurr->height != size.y))
+	{
+		ssao_blurr = new GFX::FBO();
+		ssao_blurr->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_blurr->color_textures[0]->setName("SSAO_BLURR");
+		weights = calculate_weights(kernel_size, sigma);
+	}
+
 	gbuffers->bind();
 	camera->enable();
 
@@ -334,16 +361,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}
 
 	gbuffers->unbind();
-
-	//ssao
-
-	if (!ssao_fbo || (ssao_fbo->width != size.x || ssao_fbo->height != size.y))
-	{
-		ssao_fbo = new GFX::FBO();
-		//ssao_fbo->create(size.x / 2.0, size.y / 2.0, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
-		ssao_fbo->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
-		ssao_fbo->color_textures[0]->setName("SSAO");
-	}
 	
 	ssao_fbo->bind();
 	glClearColor(1, 1, 1, 1);
@@ -375,13 +392,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	ssao_fbo->unbind();
 
-	if (!ssao_blurr || (ssao_blurr->width != size.x || ssao_blurr->height != size.y))
-	{
-		ssao_blurr = new GFX::FBO();
-		ssao_blurr->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
-		ssao_blurr->color_textures[0]->setName("SSAO_BLURR");
-		weights = calculate_weights(kernel_size, sigma);
-	}
 	ssao_blurr->bind();
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -623,7 +633,18 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
-		illumination->color_textures[0]->toViewport();
+		if (deactivate_tonemapper) {
+			illumination->color_textures[0]->toViewport();
+		}
+		else {
+			shader = GFX::Shader::Get("tone_mapper");
+			shader->enable();
+			shader->setUniform("u_scale", scale);
+			shader->setUniform("u_average_lum", average_lum);
+			shader->setUniform("u_lumwhite2", lumwhite2);
+			shader->setUniform("u_igamma", float(1.0 / igamma));
+			illumination->color_textures[0]->toViewport(shader);
+		}
 	if (show_gbuffer == eShowGBuffer::COLOR)
 		gbuffers->color_textures[0]->toViewport();
 	if (show_gbuffer == eShowGBuffer::NORMAL)
@@ -1136,25 +1157,25 @@ void Renderer::showUI()
 	ImGui::Checkbox("Boundaries", &render_boundaries);
 
 	if (ImGui::TreeNode("Texture OPTIONS")) {
-		ImGui::Checkbox("Deactivate_Albedo_texture", &albedo_texture);
-		ImGui::Checkbox("Deactivate_Emissive_texture", &emissive_texture);
-		ImGui::Checkbox("Deactivate_MetallicRoughness_texture", &metallicRoughness_texture);
-		ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
-		ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
-		ImGui::Checkbox("Remove_textures", &white_textures);
-		ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
-		ImGui::Checkbox("Remove_PBR", &Remove_PBR);
+		ImGui::Checkbox("Deactivate Albedo Texture", &albedo_texture);
+		ImGui::Checkbox("Deactivate Emissive Texture", &emissive_texture);
+		ImGui::Checkbox("Deactivate MetallicRoughness Texture", &metallicRoughness_texture);
+		ImGui::Checkbox("Deactivate NormalMap Texture", &normalMap_texture);
+		ImGui::Checkbox("Deactivate Occlusion Texture", &occlusion_texture);
+		ImGui::Checkbox("Remove Textures", &white_textures);
+		ImGui::Checkbox("Remove Alpha Renderables", &skip_alpha_renderables);
+		ImGui::Checkbox("Remove PBR", &Remove_PBR);
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNode("Light OPTIONS")) {
-		ImGui::Checkbox("Deactivate_ambient_light", &deactivate_ambient_light);
-		ImGui::Checkbox("Remove_lights", &skip_lights);
+		ImGui::Checkbox("Deactivate Ambient Light", &deactivate_ambient_light);
+		ImGui::Checkbox("Remove Lights", &skip_lights);
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNode("Shadow OPTIONS")) {
-		ImGui::Checkbox("Remove_shadows", &skip_shadows);
+		ImGui::Checkbox("Remove Shadows", &skip_shadows);
 		// Create a slider for the exponent
 		if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
 			// Calculate the actual shadowmap size as a power of two
@@ -1175,6 +1196,14 @@ void Renderer::showUI()
 		ImGui::Checkbox("Blurr", &blurr);
 		ImGui::DragInt("Kernel Size", &kernel_size, 1.0f, 1.0f, 5.0f);
 		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNode("TONEMAPPER OPTIONS")) {
+		ImGui::Checkbox("Deactivate Tonemapper", &deactivate_tonemapper);
+		ImGui::DragFloat("Scale", &scale, 0.01f, 0.001f, 10.0f);
+		ImGui::DragFloat("Average Lum", &average_lum, 0.001f, 0.001f, 10.0f);
+		ImGui::DragFloat("Lum White2", &lumwhite2, 0.01f, 0.001f, 10.0f);
+		ImGui::DragFloat("Igamma", &igamma, 0.001f, 0.001f, 10.0f);
 	}
 }
 
