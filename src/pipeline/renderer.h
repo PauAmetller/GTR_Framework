@@ -77,6 +77,7 @@ namespace SCN {
 		bool ssao_texture;
 		bool blurr;
 		bool deactivate_tonemapper;
+		bool Linear_space;
 
 		float ssao_max_distance;
 

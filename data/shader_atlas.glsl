@@ -82,6 +82,18 @@ void main()
 	FragColor = u_color;
 }
 
+\GammaToLinear
+
+vec3 degamma(vec3 c)
+{
+	return pow(c,vec3(2.2));
+}
+
+vec3 gamma(vec3 c)
+{
+	return pow(c,vec3(1.0/2.2));
+}
+
 \ComputeShadow
 
 //Shadow_map resources
@@ -512,6 +524,7 @@ uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
 uniform vec3 u_camera_pos;
 uniform float u_linear_factor;
+uniform int u_linear_space;
 
 uniform int u_PBR;
 
@@ -519,8 +532,12 @@ uniform int u_PBR;
 #define SPOTLIGHT 2
 #define DIRECTIONALLIGHT 3
 
+#define LINEAR_SPACE 1
+
 out vec4 FragColor;
 out float glFragDepth;
+
+#include "GammaToLinear"
 
 #include "ComputeShadow"
 
@@ -538,9 +555,16 @@ void main()
 
 	vec4 GB0 = texture( u_color_texture, uv );
 	vec4 GB1 = texture( u_normal_texture, uv );
-	vec3 emissive = texture(u_emissive_occlusion_texture, uv).xyz;
 	float occlusion = texture(u_emissive_occlusion_texture, uv).w; 
-	vec3 color = GB0.xyz;
+	vec3 emissive;
+	vec3 color;
+	if (u_linear_space == LINEAR_SPACE){
+		color = degamma(GB0.xyz);
+		emissive = degamma(texture(u_emissive_occlusion_texture, uv).xyz);
+	} else {
+		color = GB0.xyz;
+		emissive = texture(u_emissive_occlusion_texture, uv).xyz;
+	}
 	float metalness = GB0.a;
 	float roughness = GB1.a;
 
@@ -572,8 +596,12 @@ void main()
 
 	final_color = ((NdotL * light_add) + light) * color.xyz + emissive * u_emissive_first;
 
-	FragColor = vec4(final_color, 1.0);
-	//FragColor = vec4(ao_factor, ao_factor, ao_factor, 1.0); 
+
+	if (u_linear_space == LINEAR_SPACE){
+		FragColor = vec4(gamma(final_color), 1.0);
+	} else {
+		FragColor = vec4(final_color, 1.0);
+	}
 	glFragDepth = depth;
 
 }
@@ -610,12 +638,17 @@ uniform vec2 u_light_cone_info;
 
 uniform int u_light_type;
 uniform int u_PBR;
+uniform int u_linear_space;
 
 #define POINTLIGHT 1
 #define SPOTLIGHT 2
 #define DIRECTIONALLIGHT 3
 
+#define LINEAR_SPACE 1
+
 out vec4 FragColor;
+
+#include "GammaToLinear"
 
 #include "ComputeShadow"
 
@@ -628,12 +661,20 @@ void main()
 	vec2 uv = v_uv;
 	vec4 color = u_color;
 	color *= texture( u_texture_albedo, v_uv );
-	
-	float metalness = texture(u_texture_metallic_roughness, v_uv).z;
-	float roughness = texture(u_texture_metallic_roughness, v_uv).y;
+	vec3 emissive;
 
 	if(color.a < u_alpha_cutoff)
 		discard;
+
+	if (u_linear_space == LINEAR_SPACE){
+		color.xyz = degamma(color.xyz);
+		emissive = degamma(texture(u_texture_emissive, v_uv).xyz);
+	} else {
+		emissive = texture(u_texture_emissive, v_uv).xyz;
+	}
+	
+	float metalness = texture(u_texture_metallic_roughness, v_uv).z;
+	float roughness = texture(u_texture_metallic_roughness, v_uv).y;
 
 	vec3 light = u_ambient_light * texture(u_texture_occlusion, v_uv).x;
 	
@@ -651,7 +692,11 @@ void main()
 	light += (NdotL * light_add);
 
 	vec4 final_color;
-	final_color.xyz = (color.xyz * light) + u_emissive_factor * texture( u_texture_emissive, v_uv ).xyz;
+	if (u_linear_space == LINEAR_SPACE){
+		final_color.xyz = gamma((color.xyz * light) + u_emissive_factor * emissive);
+	} else {
+		final_color.xyz = (color.xyz * light) + u_emissive_factor * emissive;
+	}
 	final_color.a = color.a;
 	
 	FragColor = final_color;

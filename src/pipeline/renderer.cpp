@@ -55,6 +55,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
 	deactivate_tonemapper = false;
+	Linear_space = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -450,6 +451,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	shader->setUniform("u_emissive_first", vec3(1.0));
 	shader->setUniform("u_light_type", 0);
 	shader->setUniform("u_linear_factor", ssao_linear);
+	shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 	quad->render(GL_TRIANGLES);
 
 	shader->disable();
@@ -467,6 +469,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 		shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 		shader->setUniform("u_emissive_first", vec3(0.0));
+		shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
 		glDisable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LESS);
@@ -562,6 +565,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 			shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 			shader->setUniform("u_emissive_first", vec3(0.0));
+			shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
 			cameraToShader(camera, shader);
 
@@ -1059,6 +1063,7 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 		shader->setUniform("u_emissive_factor", vec3(0.0));
 	}
 	shader->setUniform("u_norm_contr", normalMap_texture);
+	shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
 	shader->setUniform("u_color", material->color);
 	shader->setUniform("u_texture_albedo", textureAlbedo, 0);
@@ -1155,6 +1160,8 @@ void Renderer::showUI()
 
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);
+
+	ImGui::Checkbox("Work in Linear Space", &Linear_space);
 
 	if (ImGui::TreeNode("Texture OPTIONS")) {
 		ImGui::Checkbox("Deactivate Albedo Texture", &albedo_texture);
