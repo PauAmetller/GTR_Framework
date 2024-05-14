@@ -44,7 +44,6 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	metallicRoughness_texture = false;
 	normalMap_texture = false;
 	white_textures = false;
-	ssao_texture_unactive = false;
 	skip_lights = false;
 	skip_shadows = false;
 	skip_alpha_renderables = false;
@@ -1144,7 +1143,6 @@ void Renderer::showUI()
 	ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
 	ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
 	ImGui::Checkbox("Remove_textures", &white_textures);
-	ImGui::Checkbox("Remove_ssao_texture", &ssao_texture_unactive);
 	ImGui::Checkbox("Remove_lights", &skip_lights);
 	ImGui::Checkbox("Remove_shadows", &skip_shadows);
 	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
