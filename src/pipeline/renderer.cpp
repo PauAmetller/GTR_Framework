@@ -433,7 +433,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	shader->enable();
 	GbuffersToShader(gbuffers, shader);
 
-	shader->setUniform("u_ambient_light", scene->ambient_light);
+	shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
 	shader->setUniform("u_ao_texture", texture_ssao, 4);
 	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
