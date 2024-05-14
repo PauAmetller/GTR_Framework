@@ -74,7 +74,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 
 	ssao_radius = 5.0;
 	ssao_max_distance = 1.0f;
-	ssao_linear = 3.0f;
+	ssao_linear = 2.2f;
 	random_points = generateSpherePoints(64, 1, false);
 	kernel_size = 5;
 	sigma = 1.0f;
@@ -1135,25 +1135,35 @@ void Renderer::showUI()
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Boundaries", &render_boundaries);
 
-	ImGui::Checkbox("Deactivate_ambient_light", &deactivate_ambient_light);
-	ImGui::Checkbox("Deactivate_Albedo_texture", &albedo_texture);
-	ImGui::Checkbox("Deactivate_Emissive_texture", &emissive_texture);
-	ImGui::Checkbox("Deactivate_MetallicRoughness_texture", &metallicRoughness_texture);
-	ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
-	ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
-	ImGui::Checkbox("Remove_textures", &white_textures);
-	ImGui::Checkbox("Remove_lights", &skip_lights);
-	ImGui::Checkbox("Remove_shadows", &skip_shadows);
-	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
-	ImGui::Checkbox("Remove_PBR", &Remove_PBR);
-
-	// Create a slider for the exponent
-	if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
-		// Calculate the actual shadowmap size as a power of two
-		shadow_map_size = (1 << power_of_two);
+	if (ImGui::TreeNode("Texture OPTIONS")) {
+		ImGui::Checkbox("Deactivate_Albedo_texture", &albedo_texture);
+		ImGui::Checkbox("Deactivate_Emissive_texture", &emissive_texture);
+		ImGui::Checkbox("Deactivate_MetallicRoughness_texture", &metallicRoughness_texture);
+		ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
+		ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
+		ImGui::Checkbox("Remove_textures", &white_textures);
+		ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
+		ImGui::Checkbox("Remove_PBR", &Remove_PBR);
+		ImGui::TreePop();
 	}
-	// Display the actual shadowmap size
-	ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
+
+	if (ImGui::TreeNode("Light OPTIONS")) {
+		ImGui::Checkbox("Deactivate_ambient_light", &deactivate_ambient_light);
+		ImGui::Checkbox("Remove_lights", &skip_lights);
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNode("Shadow OPTIONS")) {
+		ImGui::Checkbox("Remove_shadows", &skip_shadows);
+		// Create a slider for the exponent
+		if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
+			// Calculate the actual shadowmap size as a power of two
+			shadow_map_size = (1 << power_of_two);
+		}
+		// Display the actual shadowmap size
+		ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
+		ImGui::TreePop();
+	}
 
 	if (ImGui::TreeNode("SSAO OPTIONS")) {
 		ImGui::Combo("SSAO Mode", (int*)&ssao_mode, "SSAO\0SSAO+\0", eSSAOMODE::SSAO_COUNT);
@@ -1161,11 +1171,9 @@ void Renderer::showUI()
 		ImGui::Checkbox("Show only SSAO", &show_ssao);
 		ImGui::DragFloat("Radius", &ssao_radius, 0.01f, 0.0f);
 		ImGui::DragFloat("Max Distance", &ssao_max_distance, 0.001f, 0.001f, 1.0f);
-		ImGui::DragFloat("Linearise", &ssao_linear, 0.01f, 0.01f, 10.0f);
 
 		ImGui::Checkbox("Blurr", &blurr);
-		ImGui::DragInt("Kernel Size", &kernel_size, 1.0f, 1.0f, 15.0f);
-		ImGui::DragFloat("Sigma", &sigma, 0.01f, 0.0f, 10.0f);
+		ImGui::DragInt("Kernel Size", &kernel_size, 1.0f, 1.0f, 5.0f);
 		ImGui::TreePop();
 	}
 }
