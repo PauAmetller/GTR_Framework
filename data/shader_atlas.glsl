@@ -546,7 +546,9 @@ void main()
 
 	float ao_factor = texture( u_ao_texture, uv ).x;
 
-	ao_factor = pow( ao_factor, u_linear_factor);
+	ao_factor = pow( ao_factor, 1.0/u_linear_factor);
+
+	ao_factor = clamp( ao_factor, 0.0, 1.0);
 
 	vec3 light = u_ambient_light * occlusion * ao_factor;
 	//vec3 light = u_ambient_light * ao_factor;
