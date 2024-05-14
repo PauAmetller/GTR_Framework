@@ -412,7 +412,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	//ssao_blurr_shader->disable();
 	ssao_blurr->unbind();
 
-	ssao_fbo->color_textures[0]->bind();
+	ssao_blurr->color_textures[0]->bind();
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	illumination->bind();
@@ -675,7 +675,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	}
 	if(show_ssao)
-		ssao_fbo->color_textures[0]->toViewport();
+		if(!blurr)
+			ssao_fbo->color_textures[0]->toViewport();
+		else
+			ssao_blurr->color_textures[0]->toViewport();
 }
 
 
@@ -1171,7 +1174,7 @@ void Renderer::showUI()
 		ImGui::Checkbox("Show only SSAO", &show_ssao);
 		ImGui::DragFloat("Radius", &ssao_radius, 0.01f, 0.0f);
 		ImGui::DragFloat("Max Distance", &ssao_max_distance, 0.001f, 0.001f, 0.5f);
-		ImGui::DragFloat("Linearise", &ssao_linear, 0.01f, 0.0f, 10.0f);
+		ImGui::DragFloat("Linearise", &ssao_linear, 0.01f, 0.01f, 10.0f);
 
 		ImGui::Checkbox("Blurr", &blurr);
 		ImGui::DragInt("Kernel Size", &kernel_size, 1.0f, 1.0f, 15.0f);

@@ -9,7 +9,7 @@ gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
 deferred_ws basic.vs deferred_global.fs
 ssao quad.vs ssao.fs
-blurr basic.vs blurr.fs
+blurr quad.vs blurr.fs
 
 \basic.vs
 
