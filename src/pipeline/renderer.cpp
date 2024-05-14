@@ -1198,7 +1198,7 @@ void Renderer::showUI()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNode("TONEMAPPER OPTIONS")) {
+	if (ImGui::TreeNode("Tonemapper OPTIONS")) {
 		ImGui::Checkbox("Deactivate Tonemapper", &deactivate_tonemapper);
 		ImGui::DragFloat("Scale", &scale, 0.01f, 0.001f, 10.0f);
 		ImGui::DragFloat("Average Lum", &average_lum, 0.001f, 0.001f, 10.0f);
