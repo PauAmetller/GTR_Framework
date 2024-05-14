@@ -42,6 +42,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	metallicRoughness_texture = false;
 	normalMap_texture = false;
 	white_textures = false;
+	ssao_texture_unactive = false;
 	skip_lights = false;
 	skip_shadows = false;
 	skip_alpha_renderables = false;
@@ -383,11 +384,11 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	GFX::Texture* ssao_texture = NULL;
 
 	if (!white_textures) {
-		if (!ssao_texture)
+		//if (!ssao_texture)
 			ssao_texture = ssao_fbo->color_textures[0];
 	}
 
-	if (ssao_texture == NULL)
+	if (ssao_texture == NULL || ssao_texture_unactive)
 		ssao_texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
 	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
@@ -397,7 +398,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	GbuffersToShader(gbuffers, shader);
 
 	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_ao_texture", ssao_texture);
+	shader->setUniform("u_ao_texture", ssao_texture, 4);
 	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	shader->setUniform("u_emissive_first", vec3(1.0));
@@ -1102,10 +1103,10 @@ void Renderer::showUI()
 	ImGui::Checkbox("Deactivate_NormalMap_texture", &normalMap_texture);
 	ImGui::Checkbox("Deactivate_Occlusion_texture", &occlusion_texture);
 	ImGui::Checkbox("Remove_textures", &white_textures);
+	ImGui::Checkbox("Remove_ssao_texture", &ssao_texture_unactive);
 	ImGui::Checkbox("Remove_lights", &skip_lights);
 	ImGui::Checkbox("Remove_shadows", &skip_shadows);
 	ImGui::Checkbox("Remove_alpha", &skip_alpha_renderables);
-
 	ImGui::Checkbox("Remove_PBR", &Remove_PBR);
 
 	// Create a slider for the exponent

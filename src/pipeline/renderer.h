@@ -67,6 +67,7 @@ namespace SCN {
 		bool skip_shadows;
 		bool skip_alpha_renderables;
 		bool Remove_PBR;
+		bool ssao_texture_unactive;
 		bool show_ssao;
 
 		float ssao_max_distance;
