@@ -76,14 +76,23 @@ namespace SCN {
 		bool show_ssao;
 		bool ssao_texture;
 		bool blurr;
+		bool deactivate_tonemapper;
 
 		float ssao_max_distance;
 
 		int shadow_map_index;
 		int shadow_map_size;
 		int power_of_two = 10; //exponent for shadow_map_size
+
+		//SSAO blur
 		int kernel_size;
 		float sigma;
+
+		//Tonemapper
+		float scale; //color scale before tonemapper
+		float average_lum;
+		float lumwhite2;
+		float igamma;
 
 		ePipelineMode pipeline_mode;
 		eShowGBuffer show_gbuffer;
@@ -102,6 +111,7 @@ namespace SCN {
 		std::vector<LightEntity*> point_and_spot_lights; //////////
 		LightEntity* moon_light; ////////
 
+		//SSAO
 		float ssao_radius;
 		float ssao_linear;
 

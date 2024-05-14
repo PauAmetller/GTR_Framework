@@ -10,6 +10,7 @@ deferred_global quad.vs deferred_global.fs
 deferred_ws basic.vs deferred_global.fs
 ssao quad.vs ssao.fs
 blurr quad.vs blurr.fs
+tone_mapper quad.vs tonemapper.fs
 
 \basic.vs
 
@@ -781,18 +782,50 @@ layout(location = 0) out vec4 FragColor;
 
 void main()
 {             
+	vec2 uv = v_uv;
     	vec2 tex_offset = 1.0 / vec2(textureSize(u_texture, 0)); // gets size of single texel
-    	vec3 result = texture(u_texture, v_uv).rgb * u_weight[0];
+    	vec3 result = texture(u_texture, uv).rgb * u_weight[0];
 	float total_weight = u_weight[0];
 	int half_kernel = u_kernel_size / 2;
         for(int i = -half_kernel; i < half_kernel; ++i)
         {
 		for(int j = -half_kernel; j < half_kernel; ++j)
         	{
-			result += texture(u_texture, v_uv + vec2(tex_offset.x * float(i), tex_offset.y * float(j))).rgb * u_weight[abs(i) + abs(j)];
+			result += texture(u_texture, uv + vec2(tex_offset.x * float(i), tex_offset.y * float(j))).rgb * u_weight[abs(i) + abs(j)];
 			total_weight += u_weight[abs(i) + abs(j)];
 		}
         }
 
     	FragColor = vec4(result / total_weight, 1.0);
+}
+
+\tonemapper.fs
+
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_texture;
+uniform float u_scale; //color scale before tonemapper
+uniform float u_average_lum; 
+uniform float u_lumwhite2;
+uniform float u_igamma; //inverse gamma
+
+out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = v_uv;
+	vec4 color = texture2D( u_texture, uv );
+	vec3 rgb = color.xyz;
+
+	float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+	float L = (u_scale / u_average_lum) * lum;
+	float Ld = (L * (1.0 + L / u_lumwhite2)) / (1.0 + L);
+
+	rgb = (rgb / lum) * Ld;
+	rgb = max(rgb,vec3(0.001));
+	rgb = pow( rgb, vec3( u_igamma ) );
+	gl_FragColor = vec4( rgb, color.a );
+
 }
