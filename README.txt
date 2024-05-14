@@ -31,6 +31,7 @@ per calcular la llum, hem fet els seus dot products i applicat les formules prop
 Poden observar que tot i que enfosqueix la scena, ja que fa que només reflexi una part de la llum depenent
 de les propietats del material, fa que algun objectes metallics com els retrovisors es noti un llum molt 
 més realista.
+Simplement té una checkbox per activar-lo o desactivar-lo, dins de Texture OPTIONS.
 
 Després, hem aplicat l'algoritme del SSAO per poder afegir una ambient oclusion més
 fidel a l'escena. Per fer això, ens centrem a generar punts aleatoris dintre d'una esfera,
