@@ -304,15 +304,14 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	vec2 size = CORE::getWindowSize();
 	GFX::Mesh* quad = GFX::Mesh::getQuad();
-
 	//generear los GBuffers
-	if (!gbuffers)
+	if (!gbuffers || (gbuffers->width != size.x || gbuffers->height != size.y))
 	{
 		gbuffers = new GFX::FBO();
 		gbuffers->create(size.x, size.y, 4, GL_RGBA, GL_UNSIGNED_BYTE, true);
 	}
 
-	if (!illumination) {
+	if (!illumination || (illumination->width != size.x || illumination->height != size.y)) {
 		illumination = new GFX::FBO();
 		illumination->create(size.x, size.y, 1, GL_RGBA, GL_FLOAT, true);
 	}
@@ -338,7 +337,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	//ssao
 
-	if (!ssao_fbo)
+	if (!ssao_fbo || (ssao_fbo->width != size.x || ssao_fbo->height != size.y))
 	{
 		ssao_fbo = new GFX::FBO();
 		//ssao_fbo->create(size.x / 2.0, size.y / 2.0, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
@@ -376,7 +375,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	ssao_fbo->unbind();
 
-	if (!ssao_blurr)
+	if (!ssao_blurr || (ssao_blurr->width != size.x || ssao_blurr->height != size.y))
 	{
 		ssao_blurr = new GFX::FBO();
 		ssao_blurr->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
