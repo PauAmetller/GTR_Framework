@@ -9,6 +9,7 @@ gbuffers basic.vs gbuffers.fs
 deferred_global quad.vs deferred_global.fs
 deferred_ws basic.vs deferred_global.fs
 ssao quad.vs ssao.fs
+blurr basic.vs blurr.fs
 
 \basic.vs
 
@@ -393,32 +394,72 @@ uniform vec2 u_iRes;
 uniform float u_radius;
 uniform vec3 u_points[64];
 uniform float u_max_distance;
+uniform float u_linear_factor;
+uniform vec3 u_camera_position;
+uniform vec3 u_front;
+uniform float u_far;
+uniform float u_near;
+uniform int u_ssao_plus;
 
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+
+//random value from uv
+float rand(vec2 co)
+{
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+//create rotation matrix from arbitrary axis and angle
+mat4 rotationMatrix( vec3 axis, float angle )
+{
+    axis = normalize(axis);
+    float s = sin(angle);
+    float c = cos(angle);
+    float oc = 1.0 - c;
+    
+    return mat4(oc * axis.x * axis.x + c, oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0, oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c, oc * axis.y * axis.z - axis.x * s,  0.0,oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0, 0.0, 0.0, 0.0, 1.0);
+}
+
+float depthToLinear(float z)
+{
+	return u_near * (z + 1.0) 
+/ (u_far + u_near - z * (u_far - u_near));
+}
+
 
 void main()
 {
-	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
-	vec3 N = texture( u_normal_texture, v_uv ).xyz * 2.0 - vec3(1.0);
+	vec2 uv = gl_FragCoord.xy * u_iRes.xy;
+	vec3 N = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
 	N = normalize(N);
-	float depth = texture( u_depth_texture, v_uv).x;
+	float depth = texture( u_depth_texture,uv).x;
 	if(depth == 1.0)
 		discard;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	float dist = length(u_camera_position - v_world_position);
+	
 	int num = 64;
 	
 	for(int i = 0; i < 64; ++i)
 	{
 		vec3 random_point = u_points[i];
+		
+		if(u_ssao_plus == 1.0)
+		{
+			//check in which side of the normal
+			if(dot(N,random_point) < 0.0)
+				random_point *= -1.0;
+		}
 
-		//check in which side of the normal
-		if(dot(N,random_point) < 0.0)
-			random_point *= -1.0;
-		//vec3 p = v_world_position + u_points[i] * u_radius;
-		vec3 p = v_world_position + random_point * u_radius;
+		vec3 offset = random_point * u_radius  * (dist * 0.001);
+		mat4 rot = rotationMatrix( u_front, rand(gl_FragCoord.xy));
+		offset = (rot * vec4(offset, 1.0)).xyz;
+		vec3 p = v_world_position + offset;
+
 		vec4 proj = u_viewprojection * vec4(p, 1.0);
 		proj.xy /= proj.w; //convert to clipspace from homogeneous
 		//apply a tiny bias to its z before converting to clip-space
@@ -427,12 +468,18 @@ void main()
 
 		//read p true depth
 		float pdepth = texture( u_depth_texture, proj.xy ).x;
-		//compare true depth with its depth
-		if( pdepth < proj.z) //if true depth smaller, is inside
-			num--; //remove this point from the list of visible
+		//linearize the depth
+		pdepth = depthToLinear(pdepth) ;
+		float projz = depthToLinear(proj.z);
+		float diff = pdepth - projz;
+		//check how far it is
+		if( diff < 0.0 && abs(diff) < u_max_distance) 
+			num--;
 	}
 
 	float ao = float(num) / 64.0;
+
+	ao = pow(ao, 1.0/u_linear_factor);
 	FragColor = vec4(ao, ao, ao, 1.0); 
 }
 
@@ -461,10 +508,10 @@ uniform vec3 u_light_front;
 uniform vec2 u_light_cone_info;
 uniform float u_light_max_distance;
 uniform vec3 u_emissive_first;
-
 uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
 uniform vec3 u_camera_pos;
+uniform float u_linear_factor;
 
 uniform int u_PBR;
 
@@ -499,9 +546,10 @@ void main()
 
 	float ao_factor = texture( u_ao_texture, uv ).x;
 
-	//ao_factor = pow( ao_factor, 3.0 );
+	ao_factor = pow( ao_factor, 1.0/u_linear_factor );
 
-	vec3 light = u_ambient_light * occlusion;// * ao_factor;
+	vec3 light = u_ambient_light * occlusion * ao_factor;
+	//vec3 light = u_ambient_light * ao_factor;
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
@@ -522,6 +570,7 @@ void main()
 	final_color = ((NdotL * light_add) + light) * color.xyz + emissive * u_emissive_first;
 
 	FragColor = vec4(final_color, 1.0);
+	//FragColor = vec4(ao_factor, ao_factor, ao_factor, 1.0); 
 	glFragDepth = depth;
 
 }
@@ -713,4 +762,42 @@ void main()
 
 	//calcule the position of the vertex using the matrices
 	gl_Position = u_viewprojection * vec4( v_world_position, 1.0 );
+}
+
+\blurr.fs
+
+#version 330 core
+
+in vec2 TexCoords;
+
+uniform sampler2D u_texture;
+uniform bool u_horizontal;
+uniform int u_kernel_size;
+const int MAX_KERNEL_SIZE = 100;
+uniform float u_weight[MAX_KERNEL_SIZE];
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{             
+    	vec2 tex_offset = 1.0 / textureSize(u_texture, 0); // gets size of single texel
+    	vec3 result = texture(u_texture, TexCoords).rgb * u_weight[0];
+   	if(u_horizontal)
+    	{
+        	for(int i = 1; i < u_kernel_size; ++i)
+        	{
+           		result += texture(u_texture, TexCoords + vec2(tex_offset.x * i, 0.0)).rgb * u_weight[i];
+            		result += texture(u_texture, TexCoords - vec2(tex_offset.x * i, 0.0)).rgb * u_weight[i];
+        	}
+    	}
+    	else
+    	{
+        	for(int i = 1; i < u_kernel_size; ++i)
+        	{
+            		result += texture(u_texture, TexCoords + vec2(0.0, tex_offset.y * i)).rgb * u_weight[i];
+            		result += texture(u_texture, TexCoords - vec2(0.0, tex_offset.y * i)).rgb * u_weight[i];
+        	}
+    	}
+    	//FragColor = vec4(result, 1.0);
+	FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }

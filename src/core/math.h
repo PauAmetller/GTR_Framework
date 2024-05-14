@@ -422,6 +422,7 @@ std::ostream& operator << (std::ostream& os, const Vector3f& v);
 std::ostream& operator << (std::ostream& os, const Vector4f& v);
 
 std::vector<Vector3f> generateSpherePoints(int num, float radius, bool hemi);
+std::vector<float> calculate_weights(int kernel_size, float sigma);
 
 //generic types
 

@@ -1640,3 +1640,22 @@ std::vector<Vector3f> generateSpherePoints(int num,
 	return points;
 }
 
+std::vector<float> calculate_weights(int kernel_size, float sigma) {
+	std::vector<float> weights(kernel_size);
+	float sum = 0.0f; // For normalization
+
+	// Calculate weights
+	for (int i = 0; i < kernel_size; ++i) {
+		float x = i - kernel_size / 2;
+		weights[i] = exp(-x * x / (2 * sigma * sigma)) / sqrt(2 * PI * sigma * sigma);
+		sum += weights[i];
+	}
+
+	// Normalize weights
+	for (int i = 0; i < kernel_size; ++i) {
+		weights[i] /= sum;
+	}
+
+	return weights;
+}
+
