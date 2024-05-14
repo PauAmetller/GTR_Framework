@@ -73,9 +73,9 @@ Renderer::Renderer(const char* shader_atlas_filename)
 		shadow_maps[i] = nullptr;
 	}
 
-	ssao_radius = 1.0;
+	ssao_radius = 5.0;
 	ssao_max_distance = 1.0f;
-	ssao_linear = 1.0f;
+	ssao_linear = 3.0f;
 	random_points = generateSpherePoints(64, 1, false);
 	kernel_size = 5;
 	sigma = 1.0f;
@@ -1163,7 +1163,7 @@ void Renderer::showUI()
 		ImGui::Checkbox("Remove SSAO", &ssao_texture);
 		ImGui::Checkbox("Show only SSAO", &show_ssao);
 		ImGui::DragFloat("Radius", &ssao_radius, 0.01f, 0.0f);
-		ImGui::DragFloat("Max Distance", &ssao_max_distance, 0.001f, 0.001f, 0.5f);
+		ImGui::DragFloat("Max Distance", &ssao_max_distance, 0.001f, 0.001f, 1.0f);
 		ImGui::DragFloat("Linearise", &ssao_linear, 0.01f, 0.01f, 10.0f);
 
 		ImGui::Checkbox("Blurr", &blurr);
