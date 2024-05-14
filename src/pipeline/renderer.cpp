@@ -395,24 +395,14 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	ssao_blurr_shader->enable();
 	ssao_blurr_shader->setUniform("u_texture", ssao_fbo->color_textures[0], 0);
 	ssao_blurr_shader->setUniform("u_kernel_size", kernel_size);
-	ssao_blurr_shader->setUniform("u_horizontal", true);
 	ssao_blurr_shader->setUniform1Array("u_weight", (float*) &weights[0], kernel_size);
 
 	//ssao_blurr_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_blurr->color_textures[0]->width, 1.0 / (float)ssao_blurr->color_textures[0]->height));
 	quad->render(GL_TRIANGLES);
 	//ssao_blurr_shader->disable();
-
-	//ssao_blurr_shader->enable();
-	//ssao_blurr_shader->setUniform("u_texture", ssao_fbo->color_textures[0]);
-	//ssao_blurr_shader->setUniform("u_kernel_size", kernel_size);
-	//ssao_blurr_shader->setUniform("u_horizontal", false);
-	//ssao_blurr_shader->setUniform1Array("u_weight", (float*)&weights[0], kernel_size);
-	////ssao_blurr_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_blurr->color_textures[0]->width, 1.0 / (float)ssao_blurr->color_textures[0]->height));
-	//quad->render(GL_TRIANGLES);
-	//ssao_blurr_shader->disable();
 	ssao_blurr->unbind();
 
-	ssao_blurr->color_textures[0]->bind();
+	ssao_fbo->color_textures[0]->bind();
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	illumination->bind();

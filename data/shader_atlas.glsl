@@ -422,8 +422,7 @@ mat4 rotationMatrix( vec3 axis, float angle )
 
 float depthToLinear(float z)
 {
-	return u_near * (z + 1.0) 
-/ (u_far + u_near - z * (u_far - u_near));
+	return u_near * (z + 1.0) / (u_far + u_near - z * (u_far - u_near));
 }
 
 
@@ -771,10 +770,9 @@ void main()
 
 #version 330 core
 
-in vec2 TexCoords;
+in vec2 v_uv;
 
 uniform sampler2D u_texture;
-uniform bool u_horizontal;
 uniform int u_kernel_size;
 const int MAX_KERNEL_SIZE = 100;
 uniform float u_weight[MAX_KERNEL_SIZE];
@@ -783,24 +781,18 @@ layout(location = 0) out vec4 FragColor;
 
 void main()
 {             
-    	vec2 tex_offset = 1.0 / textureSize(u_texture, 0); // gets size of single texel
-    	vec3 result = texture(u_texture, TexCoords).rgb * u_weight[0];
-   	if(u_horizontal)
-    	{
-        	for(int i = 1; i < u_kernel_size; ++i)
+    	vec2 tex_offset = 1.0 / vec2(textureSize(u_texture, 0)); // gets size of single texel
+    	vec3 result = texture(u_texture, v_uv).rgb * u_weight[0];
+	float total_weight = u_weight[0];
+	int half_kernel = u_kernel_size / 2;
+        for(int i = -half_kernel; i < half_kernel; ++i)
+        {
+		for(int j = -half_kernel; j < half_kernel; ++j)
         	{
-           		result += texture(u_texture, TexCoords + vec2(tex_offset.x * i, 0.0)).rgb * u_weight[i];
-            		result += texture(u_texture, TexCoords - vec2(tex_offset.x * i, 0.0)).rgb * u_weight[i];
-        	}
-    	}
-    	else
-    	{
-        	for(int i = 1; i < u_kernel_size; ++i)
-        	{
-            		result += texture(u_texture, TexCoords + vec2(0.0, tex_offset.y * i)).rgb * u_weight[i];
-            		result += texture(u_texture, TexCoords - vec2(0.0, tex_offset.y * i)).rgb * u_weight[i];
-        	}
-    	}
-    	//FragColor = vec4(result, 1.0);
-	FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+			result += texture(u_texture, v_uv + vec2(tex_offset.x * float(i), tex_offset.y * float(j))).rgb * u_weight[abs(i) + abs(j)];
+			total_weight += u_weight[abs(i) + abs(j)];
+		}
+        }
+
+    	FragColor = vec4(result / total_weight, 1.0);
 }
