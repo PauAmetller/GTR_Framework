@@ -33,6 +33,12 @@ enum eShowGBuffer {
 	GBUFFERS_COUNT
 };
 
+enum eSSAOMODE {
+	SSAO,
+	SSAO_PLUS,
+	SSAO_COUNT
+};
+
 namespace SCN {
 
 	class Prefab;
@@ -69,15 +75,20 @@ namespace SCN {
 		bool Remove_PBR;
 		bool ssao_texture_unactive;
 		bool show_ssao;
+		bool ssao_texture;
+		bool blurr;
 
 		float ssao_max_distance;
 
 		int shadow_map_index;
 		int shadow_map_size;
 		int power_of_two = 10; //exponent for shadow_map_size
+		int kernel_size;
+		float sigma;
 
 		ePipelineMode pipeline_mode;
 		eShowGBuffer show_gbuffer;
+		eSSAOMODE ssao_mode;
 
 		GFX::Texture* skybox_cubemap;
 		GFX::FBO* shadow_maps[NUM_SHADOW_MAPS];
@@ -93,6 +104,7 @@ namespace SCN {
 		LightEntity* moon_light; ////////
 
 		float ssao_radius;
+		float ssao_linear;
 
 		//updated every frame
 		Renderer(const char* shaders_atlas_filename );

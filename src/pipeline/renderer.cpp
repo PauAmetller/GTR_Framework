@@ -28,7 +28,9 @@ GFX::Mesh cube;
 GFX::FBO* gbuffers = nullptr;
 GFX::FBO* illumination = nullptr;
 GFX::FBO* ssao_fbo = nullptr;
+GFX::FBO* ssao_blurr = nullptr;
 std::vector<vec3> random_points;
+std::vector<float> weights;
 
 
 Renderer::Renderer(const char* shader_atlas_filename)
@@ -48,12 +50,15 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	skip_alpha_renderables = false;
 	Remove_PBR = false;
 	show_ssao = false;
+	ssao_texture = false;
+	blurr = false;
 	scene = nullptr;
 	skybox_cubemap = nullptr;
 	moon_light = nullptr;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
+	ssao_mode = eSSAOMODE::SSAO_PLUS;
 
 	shadow_map_size = 1024;
 
@@ -69,10 +74,12 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	}
 
 	ssao_radius = 1.0;
-	ssao_max_distance = 10.0f;
+	ssao_max_distance = 1.0f;
+	ssao_linear = 1.0f;
 	random_points = generateSpherePoints(64, 1, false);
-
-
+	kernel_size = 5;
+	sigma = 1.0f;
+	weights = calculate_weights(kernel_size, sigma);
 }
 
 
@@ -335,35 +342,76 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (!ssao_fbo)
 	{
 		ssao_fbo = new GFX::FBO();
-		ssao_fbo->create(size.x, size.y ,1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		//ssao_fbo->create(size.x / 2.0, size.y / 2.0, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_fbo->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
 		ssao_fbo->color_textures[0]->setName("SSAO");
 	}
+	
 	ssao_fbo->bind();
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_BLEND);
-	//disable using mipmaps
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	//enable bilinear filtering
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 
 	GFX::Shader* ssao_shader = GFX::Shader::Get("ssao");
-
 	assert(ssao_shader);
 	ssao_shader->enable();
 	ssao_shader->setUniform("u_radius", ssao_radius);
 	ssao_shader->setUniform("u_max_distance", ssao_max_distance);
 	ssao_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 0);
-	ssao_shader->setUniform("u_iRes", vec2(1.0 / ssao_fbo->color_textures[0]->width, 1.0 / ssao_fbo->color_textures[0]->height));
+	ssao_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+	ssao_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_fbo->color_textures[0]->width, 1.0 / (float)ssao_fbo->color_textures[0]->height));
 	ssao_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	ssao_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	ssao_shader->setUniform3Array("u_points", (float*) & random_points[0], random_points.size());
+	ssao_shader->setUniform3Array("u_points", (float*) &random_points[0], random_points.size());
+	ssao_shader->setUniform("u_linear_factor", ssao_linear);
+	ssao_shader->setUniform("u_front", camera->front);
+	ssao_shader->setUniform("u_camera_position", camera->eye);
+	ssao_shader->setUniform("u_far", camera->far_plane);
+	ssao_shader->setUniform("u_near", camera->near_plane);
+	if(ssao_mode == eSSAOMODE::SSAO_PLUS)
+		ssao_shader->setUniform("u_ssao_plus", 1);
+	else
+		ssao_shader->setUniform("u_ssao_plus", 0);
 	quad->render(GL_TRIANGLES);
-	ssao_shader->disable();
+
 	ssao_fbo->unbind();
+
+	if (!ssao_blurr)
+	{
+		ssao_blurr = new GFX::FBO();
+		ssao_blurr->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
+		ssao_blurr->color_textures[0]->setName("SSAO_BLURR");
+		weights = calculate_weights(kernel_size, sigma);
+	}
+	ssao_blurr->bind();
+	glClearColor(1, 1, 1, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	GFX::Shader* ssao_blurr_shader = GFX::Shader::Get("blurr");
+	assert(ssao_blurr_shader);
+	ssao_blurr_shader->enable();
+	ssao_blurr_shader->setUniform("u_texture", ssao_fbo->color_textures[0], 0);
+	ssao_blurr_shader->setUniform("u_kernel_size", kernel_size);
+	ssao_blurr_shader->setUniform("u_horizontal", true);
+	ssao_blurr_shader->setUniform1Array("u_weight", (float*) &weights[0], kernel_size);
+
+	//ssao_blurr_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_blurr->color_textures[0]->width, 1.0 / (float)ssao_blurr->color_textures[0]->height));
+	quad->render(GL_TRIANGLES);
+	//ssao_blurr_shader->disable();
+
+	//ssao_blurr_shader->enable();
+	//ssao_blurr_shader->setUniform("u_texture", ssao_fbo->color_textures[0]);
+	//ssao_blurr_shader->setUniform("u_kernel_size", kernel_size);
+	//ssao_blurr_shader->setUniform("u_horizontal", false);
+	//ssao_blurr_shader->setUniform1Array("u_weight", (float*)&weights[0], kernel_size);
+	////ssao_blurr_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_blurr->color_textures[0]->width, 1.0 / (float)ssao_blurr->color_textures[0]->height));
+	//quad->render(GL_TRIANGLES);
+	//ssao_blurr_shader->disable();
+	ssao_blurr->unbind();
+
 	ssao_fbo->color_textures[0]->bind();
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -381,15 +429,15 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (skybox_cubemap)
 		renderSkybox(skybox_cubemap);
 
-	GFX::Texture* ssao_texture = NULL;
+	GFX::Texture* texture_ssao = NULL;
 
-	if (!white_textures) {
-		//if (!ssao_texture)
-			ssao_texture = ssao_fbo->color_textures[0];
-	}
+	if (!ssao_texture && !blurr)
+		texture_ssao = ssao_fbo->color_textures[0];
+	else if(!ssao_texture && blurr)
+		texture_ssao = ssao_blurr->color_textures[0];
 
-	if (ssao_texture == NULL || ssao_texture_unactive)
-		ssao_texture = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
+	if (texture_ssao == NULL)
+		texture_ssao = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
 	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
 
@@ -398,12 +446,12 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	GbuffersToShader(gbuffers, shader);
 
 	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_ao_texture", ssao_texture, 4);
+	shader->setUniform("u_ao_texture", texture_ssao, 4);
 	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	shader->setUniform("u_emissive_first", vec3(1.0));
-
 	shader->setUniform("u_light_type", 0);
+	shader->setUniform("u_linear_factor", ssao_linear);
 	quad->render(GL_TRIANGLES);
 
 	shader->disable();
@@ -1117,9 +1165,19 @@ void Renderer::showUI()
 	// Display the actual shadowmap size
 	ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
 
-	ImGui::Checkbox("Show SSAO", &show_ssao);
-	ImGui::DragFloat("SSAO Radius", &ssao_radius, 0.01f, 0.0f);
-	ImGui::DragFloat("SSAO Max Distance", &ssao_max_distance, 0.01f, 0.0f);
+	if (ImGui::TreeNode("SSAO OPTIONS")) {
+		ImGui::Combo("SSAO Mode", (int*)&ssao_mode, "SSAO\0SSAO+\0", eSSAOMODE::SSAO_COUNT);
+		ImGui::Checkbox("Remove SSAO", &ssao_texture);
+		ImGui::Checkbox("Show only SSAO", &show_ssao);
+		ImGui::DragFloat("Radius", &ssao_radius, 0.01f, 0.0f);
+		ImGui::DragFloat("Max Distance", &ssao_max_distance, 0.001f, 0.001f, 0.5f);
+		ImGui::DragFloat("Linearise", &ssao_linear, 0.01f, 1.0f, 10.0f);
+
+		ImGui::Checkbox("Blurr", &blurr);
+		ImGui::DragInt("Kernel Size", &kernel_size, 1.0f, 1.0f, 15.0f);
+		ImGui::DragFloat("Sigma", &sigma, 0.01f, 0.0f, 10.0f);
+		ImGui::TreePop();
+	}
 }
 
 #else
