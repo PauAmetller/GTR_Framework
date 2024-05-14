@@ -1165,7 +1165,7 @@ void Renderer::showUI()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNode("SSAO OPTIONS")) {
+	if (ImGui::TreeNode("SSAO OPTIONS (Only for DEFERRED)")) {
 		ImGui::Combo("SSAO Mode", (int*)&ssao_mode, "SSAO\0SSAO+\0", eSSAOMODE::SSAO_COUNT);
 		ImGui::Checkbox("Remove SSAO", &ssao_texture);
 		ImGui::Checkbox("Show only SSAO", &show_ssao);
