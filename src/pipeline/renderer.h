@@ -3,6 +3,7 @@
 #include "prefab.h"
 
 #include "light.h"
+#include "../gfx/sphericalharmonics.h"
 
 #define NUM_SHADOW_MAPS 10
 
@@ -148,6 +149,8 @@ namespace SCN {
 
 		//to render one mesh given its material and transformation matrix, with lights
 		void renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material); ///////////
+
+		void renderProbe(vec3 pos, float scale, SphericalHarmonics& shs);
 
 		void showUI();
 

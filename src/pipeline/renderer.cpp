@@ -629,11 +629,21 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
-	glDepthMask(GL_TRUE);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
+	
 
 	illumination->unbind();
+
+	glClearColor(0, 0, 0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//SphericalHarmonics shs;
+	//shs.coeffs[1].set(1, 0, 0);
+	//renderProbe(vec3(0, 10, 0), 100, shs);
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	
 
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
@@ -1125,6 +1135,34 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 }
 /////////////
 
+
+void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
+{
+	Camera* camera = Camera::current;
+
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+
+	GFX::Shader* shader = GFX::Shader::Get("probe");
+	if (!shader)
+		return;
+	shader->enable();
+
+	Matrix44 m;
+	m.setTranslation(pos.x, pos.y, pos.z);
+	m.scale(scale, scale, scale);
+	shader->setUniform("u_model", m);
+	cameraToShader(camera, shader);
+	shader->setUniform3Array("u_coeffs", shs.coeffs[0].v, 9);
+	sphere.render(GL_TRIANGLES);
+	shader->disable();
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glEnable(GL_DEPTH_TEST);
+}
+
+
 void SCN::Renderer::cameraToShader(Camera* camera, GFX::Shader* shader)
 {
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix );
@@ -1211,6 +1249,7 @@ void Renderer::showUI()
 		ImGui::DragFloat("Average Lum", &average_lum, 0.001f, 0.001f, 10.0f);
 		ImGui::DragFloat("Lum White2", &lumwhite2, 0.01f, 0.001f, 10.0f);
 		ImGui::DragFloat("Igamma", &igamma, 0.001f, 0.001f, 10.0f);
+		ImGui::TreePop();
 	}
 }
 

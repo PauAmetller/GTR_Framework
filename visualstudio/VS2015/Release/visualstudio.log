@@ -1,127 +1,127 @@
 ﻿  renderer.cpp
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\extra\cJSON.h(103,16): warning C4099: 'cJSON': nombre de tipo visto anteriormente usando 'class' ahora se ve usando 'struct'
+C:\Users\URI\Desktop\GTR_Framework\src\extra\cJSON.h(103,16): warning C4099: 'cJSON': nombre de tipo visto anteriormente usando 'class' ahora se ve usando 'struct'
   (compilando archivo de origen "../../src/pipeline/renderer.cpp")
-  C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\extra\cJSON.h(103,16):
+  C:\Users\URI\Desktop\GTR_Framework\src\extra\cJSON.h(103,16):
   vea la declaración de 'cJSON'
   
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(208,99): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(208,79): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(208,60): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(208,40): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,32): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,32): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,32): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,32): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,32): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,24): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,24): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,24): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,24): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(320,24): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,36): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,36): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,36): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,36): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,36): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,28): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,28): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,28): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,28): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(325,28): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,32): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,32): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,32): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,32): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,32): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,24): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,24): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,24): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,24): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(334,24): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,34): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,34): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,34): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,34): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,34): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,26): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,26): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,26): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,26): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(341,26): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,94): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,94): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,94): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,94): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,94): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,45): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,45): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,45): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,45): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(379,45): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,54): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,54): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,54): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,54): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,54): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,40): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,40): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,40): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,40): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(449,40): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,55): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,55): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,55): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,55): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,55): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,41): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,41): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,41): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,41): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(469,41): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(669,52): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(669,38): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(669,24): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(672,63): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(672,49): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(672,35): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(672,21): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(675,54): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(675,40): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(675,28): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(675,21): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(679,41): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(679,27): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,32): warning C4244: 'argumento': conversión de 'T' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,32): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,32): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,32): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,32): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,24): warning C4244: 'argumento': conversión de 'T' a 'GLsizei'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,24): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,24): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,24): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(687,24): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(750,20): warning C4018: '<': no coinciden signed/unsigned
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(955,10): warning C4244: 'inicializando': conversión de 'long' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1050,10): warning C4244: 'inicializando': conversión de 'long' a 'float'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,85): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,85): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,85): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,85): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,85): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,50): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,50): warning C4244:         with
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,50): warning C4244:         [
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,50): warning C4244:             T=float
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1140,50): warning C4244:         ]
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1204,59): warning C4244: 'argumento': conversión de 'float' a 'int'; posible pérdida de datos
-C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\src\pipeline\renderer.cpp(1204,53): warning C4244: 'argumento': conversión de 'float' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(208,99): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(208,79): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(208,60): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(208,40): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,32): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,32): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,32): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,32): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,32): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,24): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,24): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,24): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,24): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(320,24): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,36): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,36): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,36): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,36): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,36): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,28): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,28): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,28): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,28): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(325,28): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,32): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,32): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,32): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,32): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,32): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,24): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,24): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,24): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,24): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(334,24): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,34): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,34): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,34): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,34): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,34): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,26): warning C4244: 'argumento': conversión de 'T' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,26): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,26): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,26): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(341,26): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,94): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,94): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,94): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,94): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,94): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,45): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,45): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,45): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,45): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(379,45): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,54): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,54): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,54): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,54): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,54): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,40): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,40): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,40): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,40): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(449,40): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,55): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,55): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,55): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,55): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,55): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,41): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,41): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,41): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,41): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(469,41): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(679,52): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(679,38): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(679,24): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(682,63): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(682,49): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(682,35): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(682,21): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(685,54): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(685,40): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(685,28): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(685,21): warning C4244: 'argumento': conversión de 'double' a 'GLint'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(689,41): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(689,27): warning C4244: 'argumento': conversión de 'double' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,32): warning C4244: 'argumento': conversión de 'T' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,32): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,32): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,32): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,32): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,24): warning C4244: 'argumento': conversión de 'T' a 'GLsizei'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,24): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,24): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,24): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(697,24): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(760,20): warning C4018: '<': no coinciden signed/unsigned
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(965,10): warning C4244: 'inicializando': conversión de 'long' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1060,10): warning C4244: 'inicializando': conversión de 'long' a 'float'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,85): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,85): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,85): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,85): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,85): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,50): warning C4244: 'argumento': conversión de 'double' a 'T'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,50): warning C4244:         with
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,50): warning C4244:         [
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,50): warning C4244:             T=float
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1178,50): warning C4244:         ]
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1242,59): warning C4244: 'argumento': conversión de 'float' a 'int'; posible pérdida de datos
+C:\Users\URI\Desktop\GTR_Framework\src\pipeline\renderer.cpp(1242,53): warning C4244: 'argumento': conversión de 'float' a 'int'; posible pérdida de datos
      Creando biblioteca ..\..\GTR.lib y objeto ..\..\GTR.exp
 LINK : warning LNK4098: la biblioteca predeterminada'LIBCMT' entra en conflicto con otras bibliotecas; use la biblioteca /NODEFAULTLIB:biblioteca
   Generando código
-  1 of 5940 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+  2 of 5962 functions (<0.1%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     67 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
 glew32s.lib(glew.obj) : warning LNK4099: no se encontró PDB '' con 'glew32s.lib(glew.obj)' o en ''; se vinculará el objeto sin tener en cuenta información de depuración
-  visualstudio.vcxproj -> C:\Users\User\OneDrive\Documentos\UPF\3rd YEAR\3rd TERM\GTR_Framework_Lab1\GTR.exe
+  visualstudio.vcxproj -> C:\Users\URI\Desktop\GTR_Framework\GTR.exe
