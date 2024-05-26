@@ -34,9 +34,19 @@ GFX::FBO* irr_fbo = nullptr;
 std::vector<vec3> random_points;
 std::vector<float> weights;
 
-sProbe probe;
+std::vector<sProbe> probes;
 
+//struct to store grid info
+struct sIrradianceInfo {
+	vec3 start;
+	vec3 end;
+	vec3 dim;
+	vec3 delta;
+	int num_probes;
+};
 
+//a place to store info about the layout of the grid
+sIrradianceInfo probes_info;
 
 Renderer::Renderer(const char* shader_atlas_filename)
 {
@@ -61,6 +71,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	moon_light = nullptr;
 	deactivate_tonemapper = false;
 	Linear_space = false;
+	probes_grid = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -94,8 +105,39 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	lumwhite2 = 1.0;
 	igamma = 1.0;
 
-	//Probe
-	probe.pos.set(-3, 10, 0);
+	//Probes
+	//define bounding of the grid and num probes
+	probes_info.start.set(-80, 0, -90);
+	probes_info.end.set(80, 80, 90);
+	probes_info.dim.set(10, 4, 10);
+
+	//compute the vector from one corner to the other
+	vec3 delta = (probes_info.end - probes_info.start);
+	//compute delta from one probe to the next one
+	delta.x /= (probes_info.dim.x - 1);
+	delta.y /= (probes_info.dim.y - 1);
+	delta.z /= (probes_info.dim.z - 1);
+	probes_info.delta = delta; //store
+
+	//lets compute the centers
+	//pay attention at the order at which we add them
+	for (int z = 0; z < probes_info.dim.z; ++z)
+		for (int y = 0; y < probes_info.dim.y; ++y)
+			for (int x = 0; x < probes_info.dim.x; ++x)
+			{
+				sProbe p;
+				p.local.set(x, y, z);
+
+				//index in the linear array
+				p.index = x + y * probes_info.dim.x + z *
+					probes_info.dim.x * probes_info.dim.y;
+
+				//and its position
+				p.pos = probes_info.start +
+					probes_info.delta * Vector3f(x, y, z);
+				probes.push_back(p);
+			}
+
 }
 
 
@@ -638,7 +680,15 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			}
 	}
 
-	renderProbe(probe.pos, 1, probe.sh);
+	//renderProbe(probe.pos, 1, probe.sh);
+	if(probes_grid)
+		renderProbes(1);
+	else {
+		glDepthMask(GL_TRUE);
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
 
 	illumination->unbind();
 
@@ -1156,13 +1206,22 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	shader->setUniform3Array("u_coeffs", shs.coeffs[0].v, 9);
 	sphere.render(GL_TRIANGLES);
 	shader->disable();
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_DEPTH_TEST);
+}
+
+void SCN::Renderer::renderProbes(float scale)
+{
+	for (auto& probe : probes)
+	{
+		renderProbe(probe.pos, scale, probe.sh);
+	}
+
 }
 
 void SCN::Renderer::captureProbe(sProbe& p)
 {
-	FloatImage images[6]; //here we will store the six views
+	static FloatImage images[6]; //here we will store the six views
 
 	if (!irr_fbo)
 	{
@@ -1196,6 +1255,16 @@ void SCN::Renderer::captureProbe(sProbe& p)
 	p.sh = computeSH(images); //You can decide whether using degamma or not
 
 }
+
+void SCN::Renderer::captureProbes()
+{
+	for (auto& probe : probes)
+	{
+		captureProbe(probe);
+	}
+
+}
+
 
 
 void SCN::Renderer::cameraToShader(Camera* camera, GFX::Shader* shader)
@@ -1290,8 +1359,9 @@ void Renderer::showUI()
 	if (ImGui::TreeNode("Irradiance OPTIONS")) {
 		if (ImGui::Button("Capture Irradiance"))
 		{
-			captureProbe(probe);
+			captureProbes();
 		}
+		ImGui::Checkbox("Render Irradiance Probes", &probes_grid);
 		ImGui::TreePop();
 }
 }

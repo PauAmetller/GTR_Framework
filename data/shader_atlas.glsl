@@ -460,7 +460,8 @@ void main()
 
 	color.xyz = ComputeSHIrradiance(N, sh);
 
-	FragColor = vec4(max(color, vec3(0.0)), 1.0);
+	//FragColor = vec4(max(color, vec3(0.0)), 1.0);
+	FragColor = vec4(color, 1.0);
 }
 
 

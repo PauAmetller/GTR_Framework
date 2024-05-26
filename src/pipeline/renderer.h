@@ -87,6 +87,7 @@ namespace SCN {
 		bool blurr;
 		bool deactivate_tonemapper;
 		bool Linear_space;
+		bool probes_grid;
 
 		float ssao_max_distance;
 
@@ -159,7 +160,9 @@ namespace SCN {
 		void renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material); ///////////
 
 		void renderProbe(vec3 pos, float scale, SphericalHarmonics& shs);
+		void renderProbes(float scale);
 		void captureProbe(sProbe& p);
+		void captureProbes();
 
 		void showUI();
 
