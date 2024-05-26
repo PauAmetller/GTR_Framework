@@ -40,6 +40,14 @@ enum eSSAOMODE {
 	SSAO_COUNT
 };
 
+//struct to store probes
+struct sProbe {
+	vec3 pos; //where is located
+	vec3 local; //its ijk pos in the matrix
+	int index; //its index in the linear array
+	SphericalHarmonics sh; //coeffs
+};
+
 namespace SCN {
 
 	class Prefab;
@@ -151,6 +159,7 @@ namespace SCN {
 		void renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mesh, SCN::Material* material); ///////////
 
 		void renderProbe(vec3 pos, float scale, SphericalHarmonics& shs);
+		void captureProbe(sProbe& p);
 
 		void showUI();
 

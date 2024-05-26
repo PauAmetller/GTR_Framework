@@ -29,8 +29,13 @@ GFX::FBO* gbuffers = nullptr;
 GFX::FBO* illumination = nullptr;
 GFX::FBO* ssao_fbo = nullptr;
 GFX::FBO* ssao_blurr = nullptr;
+GFX::FBO* irr_fbo = nullptr;
+
 std::vector<vec3> random_points;
 std::vector<float> weights;
+
+sProbe probe;
+
 
 
 Renderer::Renderer(const char* shader_atlas_filename)
@@ -40,7 +45,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	deactivate_ambient_light = false;
 	albedo_texture = false;
 	emissive_texture = false;
-	occlusion_texture = false;
+	occlusion_texture = true;
 	metallicRoughness_texture = false;
 	normalMap_texture = false;
 	white_textures = false;
@@ -88,6 +93,9 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	average_lum = 1.0;
 	lumwhite2 = 1.0;
 	igamma = 1.0;
+
+	//Probe
+	probe.pos.set(-3, 10, 0);
 }
 
 
@@ -629,21 +637,11 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 				renderMeshWithMaterialLights(re.model, re.mesh, re.material);
 			}
 	}
-	
+
+	renderProbe(probe.pos, 1, probe.sh);
 
 	illumination->unbind();
 
-	glClearColor(0, 0, 0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//SphericalHarmonics shs;
-	//shs.coeffs[1].set(1, 0, 0);
-	//renderProbe(vec3(0, 10, 0), 100, shs);
-
-	glDepthFunc(GL_LESS);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	
 
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
@@ -1162,6 +1160,43 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	glEnable(GL_DEPTH_TEST);
 }
 
+void SCN::Renderer::captureProbe(sProbe& p)
+{
+	FloatImage images[6]; //here we will store the six views
+
+	if (!irr_fbo)
+	{
+		irr_fbo = new GFX::FBO();
+		irr_fbo->create(64, 64, 1, GL_RGB, GL_FLOAT, false); 
+	}
+	Camera cam;
+	//set the fov to 90 and the aspect to 1
+	cam.setPerspective(90, 1, 0.1, 1000);
+
+	for (int i = 0; i < 6; ++i) //for every cubemap face
+	{
+		//compute camera orientation using defined vectors
+		vec3 eye = p.pos;
+		vec3 front = cubemapFaceNormals[i][2];
+		vec3 center = p.pos + front;
+		vec3 up = cubemapFaceNormals[i][1];
+		cam.lookAt(eye, center, up);
+		cam.enable();
+
+		//render the scene from this point of view
+		irr_fbo->bind();
+		renderSceneForward(scene, &cam);
+		irr_fbo->unbind();
+
+		//read the pixels back and store in a FloatImage
+		images[i].fromTexture(irr_fbo->color_textures[0]);
+	}
+
+	//compute the coefficients given the six images
+	p.sh = computeSH(images); //You can decide whether using degamma or not
+
+}
+
 
 void SCN::Renderer::cameraToShader(Camera* camera, GFX::Shader* shader)
 {
@@ -1251,6 +1286,14 @@ void Renderer::showUI()
 		ImGui::DragFloat("Igamma", &igamma, 0.001f, 0.001f, 10.0f);
 		ImGui::TreePop();
 	}
+
+	if (ImGui::TreeNode("Irradiance OPTIONS")) {
+		if (ImGui::Button("Capture Irradiance"))
+		{
+			captureProbe(probe);
+		}
+		ImGui::TreePop();
+}
 }
 
 #else

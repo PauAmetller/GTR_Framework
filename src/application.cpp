@@ -37,8 +37,13 @@ Application::Application()
 	if (!scene->load("data/scene_irradiance.json"))
 		exit(1);
 
-	camera->lookAt(scene->main_camera.eye, scene->main_camera.center, vec3(0, 1, 0));
+	//camera->lookAt(scene->main_camera.eye, scene->main_camera.center, vec3(0, 1, 0));
 	camera->fov = scene->main_camera.fov;
+
+
+	//Hardcored Camera
+	camera->lookAt(vec3(25, 31, -85), vec3(0,20,0), vec3(0, 1, 0));
+
 
 	//loads and compiles several shaders from one single file
 	//change to "data/shader_atlas_osx.txt" if you are in XCODE
