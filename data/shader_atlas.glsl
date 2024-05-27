@@ -12,6 +12,7 @@ ssao quad.vs ssao.fs
 blurr quad.vs blurr.fs
 tone_mapper quad.vs tonemapper.fs
 probe basic.vs probe.fs
+irradiance quad.vs irradiance.fs
 
 \basic.vs
 
@@ -393,17 +394,7 @@ void main()
 	FragColor = color;
 }
 
-\probe.fs
-
-#version 330 core
-
-in vec3 v_position;
-in vec3 v_world_position;
-in vec3 v_normal;
-in vec2 v_uv;
-in vec4 v_color;
-
-uniform vec3 u_coeffs[9];
+\probes
 
 const float Pi = 3.141592654;
 const float CosineA0 = Pi;
@@ -440,6 +431,21 @@ vec3 ComputeSHIrradiance(in vec3 normal, in SH9Color sh)
 
 	return irradiance;
 }
+
+
+\probe.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec3 v_world_position;
+in vec3 v_normal;
+in vec2 v_uv;
+in vec4 v_color;
+
+uniform vec3 u_coeffs[9];
+
+#include "probes"
 
 out vec4 FragColor;
 
@@ -566,6 +572,84 @@ void main()
 
 	ao = pow(ao, 1.0/u_linear_factor);
 	FragColor = vec4(ao, ao, ao, 1.0); 
+}
+
+\irradiance.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_color_texture;
+uniform sampler2D u_normal_texture;
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_extra_texture;
+uniform sampler2D u_probes_texture;
+
+uniform vec3 u_ambient_light;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+
+uniform vec3 u_irr_start;
+uniform vec3 u_irr_end;
+uniform vec3 u_irr_dims;
+uniform float u_irr_normal_distance;
+uniform float u_irr_delta;
+uniform int u_num_probes;
+out vec4 FragColor;
+
+#include probes
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
+	vec4 color = texture( u_color_texture, v_uv);
+	vec3 N = texture( u_normal_texture, v_uv ).xyz * 2.0 - vec3(1.0);
+	float depth = texture( u_depth_texture, v_uv).x;
+
+	if(depth == 1.0)
+		discard;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);	
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
+	N = normalize(N);	
+
+	vec3 final_color = vec3(0.0);
+
+	//computing nearest probe index based on world position
+	vec3 irr_range = u_irr_end - u_irr_start;
+	vec3 irr_local_pos = clamp( worldpos - u_irr_start + N * u_irr_normal_distance, vec3(0.0), irr_range );
+
+	//convert from world pos to grid pos
+	vec3 irr_norm_pos = irr_local_pos / u_irr_delta;
+
+	//round values as we cannot fetch between rows for now
+	vec3 local_indices = round( irr_norm_pos );
+
+	//compute in which row is the probe stored
+	float row = local_indices.x + 
+	local_indices.y * u_irr_dims.x + 
+	local_indices.z * u_irr_dims.x * u_irr_dims.y;
+
+	//find the UV.y coord of that row in the probes texture
+	float row_uv = (row + 1.0) / (u_num_probes + 1.0);
+
+	SH9Color sh;
+
+	//fill the coefficients
+	const float d_uvx = 1.0 / 9.0;
+	for(int i = 0; i < 9; ++i)
+	{
+		vec2 coeffs_uv = vec2( (float(i)+0.5) * d_uvx, row_uv );
+		sh.c[i] = texture( u_probes_texture, coeffs_uv).xyz;
+	}
+
+	//now we can use the coefficients to compute the irradiance
+	vec3 irradiance = ComputeSHIrradiance( N, sh );
+
+	FragColor = vec4(irradiance, 1.0);
 }
 
 \deferred_global.fs

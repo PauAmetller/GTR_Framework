@@ -36,6 +36,8 @@ std::vector<float> weights;
 
 std::vector<sProbe> probes;
 
+GFX::Texture* probes_texture = nullptr;
+
 //struct to store grid info
 struct sIrradianceInfo {
 	vec3 start;
@@ -680,6 +682,37 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			}
 	}
 
+	GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
+	assert(irr_shader);
+	irr_shader->enable();
+
+	if (probes_texture)
+	{
+		probes_info.num_probes = probes.size();
+
+		// we send every data necessary
+		irr_shader->setUniform("u_irr_start", probes_info.start);
+		irr_shader->setUniform("u_irr_end", probes_info.end);
+		irr_shader->setUniform("u_irr_dims", probes_info.dim);
+		irr_shader->setUniform("u_irr_delta", probes_info.delta);
+		irr_shader->setUniform("u_num_probes", (int)probes_info.num_probes);
+		irr_shader->setUniform("u_probes_texture", probes_texture, 4);
+
+		// you need also pass the distance factor, for now leave it as 0.0
+		irr_shader->setUniform("u_irr_normal_distance", 0.0f);
+		irr_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+		irr_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+		irr_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+		irr_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+
+		irr_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+		irr_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+		irr_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+
+		quad->render(GL_TRIANGLES);
+	}
+	
+	
 	//renderProbe(probe.pos, 1, probe.sh);
 	if(probes_grid)
 		renderProbes(1);
@@ -1263,6 +1296,34 @@ void SCN::Renderer::captureProbes()
 		captureProbe(probe);
 	}
 
+	//create the texture to store the probes (do this ONCE!!!)
+	if (probes_texture)
+		delete probes_texture;
+
+	probes_texture = new GFX::Texture(
+		9, //9 coefficients per probe
+		probes.size(), //as many rows as probes
+		GL_RGB, //3 channels per coefficient
+		GL_FLOAT); //they require a high range
+
+	//we must create the color information for the texture. because every SH are 27 floats in the RGB,RGB,... order, we can create an array of SphericalHarmonics and use it as pixels of the texture
+	SphericalHarmonics* sh_data = NULL;
+	sh_data = new SphericalHarmonics[probes_info.dim.x * probes_info.dim.y * probes_info.dim.z];
+
+	//here we fill the data of the array with our probes in x,y,z order
+	for (int i = 0; i < probes.size(); ++i)
+		sh_data[i] = probes[i].sh;
+
+	//now upload the data to the GPU as a texture
+	probes_texture->upload(GL_RGB, GL_FLOAT, false, (uint8*)sh_data);
+
+	//disable any texture filtering when reading
+	probes_texture->bind();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	//always free memory after allocating it!!!
+	delete[] sh_data;
 }
 
 
