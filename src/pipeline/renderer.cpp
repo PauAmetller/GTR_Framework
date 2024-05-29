@@ -712,7 +712,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	
 	//renderProbe(probe.pos, 1, probe.sh);
 	if (probes_grid) {
-		glDepthFunc(GL_LESS);
 		renderProbes(2);
 	}
 	else {
@@ -1224,6 +1223,7 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glDepthFunc(GL_LESS);
 
 	GFX::Shader* shader = GFX::Shader::Get("probe");
 	if (!shader)
