@@ -437,11 +437,8 @@ vec3 ComputeSHIrradiance(in vec3 normal, in SH9Color sh)
 
 #version 330 core
 
-in vec3 v_position;
 in vec3 v_world_position;
 in vec3 v_normal;
-in vec2 v_uv;
-in vec4 v_color;
 
 uniform vec3 u_coeffs[9];
 
@@ -466,8 +463,8 @@ void main()
 
 	color.xyz = ComputeSHIrradiance(N, sh);
 
-	//FragColor = vec4(max(color, vec3(0.0)), 1.0);
-	FragColor = vec4(color, 1.0);
+	FragColor = vec4(max(color, vec3(0.0)), 1.0);
+	//FragColor = vec4(color, 1.0);
 }
 
 
@@ -587,8 +584,8 @@ uniform sampler2D u_depth_texture;
 uniform sampler2D u_extra_texture;
 uniform sampler2D u_probes_texture;
 
-uniform vec3 u_ambient_light;
 uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
 uniform vec2 u_iRes;
 
 uniform vec3 u_irr_start;
@@ -599,7 +596,7 @@ uniform float u_irr_delta;
 uniform int u_num_probes;
 out vec4 FragColor;
 
-#include probes
+#include "probes"
 
 void main()
 {

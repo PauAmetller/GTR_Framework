@@ -48,6 +48,15 @@ struct sProbe {
 	SphericalHarmonics sh; //coeffs
 };
 
+//struct to store grid info
+struct sIrradianceInfo {
+	vec3 start;
+	vec3 end;
+	vec3 dim;
+	vec3 delta;
+	int num_probes;
+};
+
 namespace SCN {
 
 	class Prefab;
@@ -93,7 +102,9 @@ namespace SCN {
 
 		int shadow_map_index;
 		int shadow_map_size;
-		int power_of_two = 10; //exponent for shadow_map_size
+		int power_of_two_shadowmap = 10; //exponent for shadow_map_size
+		int irradiance_capture_size;
+		int power_of_two_irradiance = 6; //exponent for shadow_map_size
 
 		//SSAO blur
 		int kernel_size;

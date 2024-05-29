@@ -17,7 +17,6 @@
 
 #include "scene.h"
 
-///////////////////////////////////Pau//////////////////////////////////
 
 using namespace SCN;
 
@@ -37,15 +36,6 @@ std::vector<float> weights;
 std::vector<sProbe> probes;
 
 GFX::Texture* probes_texture = nullptr;
-
-//struct to store grid info
-struct sIrradianceInfo {
-	vec3 start;
-	vec3 end;
-	vec3 dim;
-	vec3 delta;
-	int num_probes;
-};
 
 //a place to store info about the layout of the grid
 sIrradianceInfo probes_info;
@@ -80,6 +70,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	ssao_mode = eSSAOMODE::SSAO_PLUS;
 
 	shadow_map_size = 1024;
+	irradiance_capture_size = 64;
 
 	if (!GFX::Shader::LoadAtlas(shader_atlas_filename))
 		exit(1);
@@ -87,6 +78,8 @@ Renderer::Renderer(const char* shader_atlas_filename)
 
 	sphere.createSphere(1.0f);
 	sphere.uploadToVRAM();
+	cube.createCube(1.0f);
+	cube.uploadToVRAM();
 
 	for (int i = 0; i < NUM_SHADOW_MAPS; i++) {
 		shadow_maps[i] = nullptr;
@@ -139,7 +132,6 @@ Renderer::Renderer(const char* shader_atlas_filename)
 					probes_info.delta * Vector3f(x, y, z);
 				probes.push_back(p);
 			}
-
 }
 
 
@@ -682,12 +674,17 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			}
 	}
 
+
 	GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
 	assert(irr_shader);
 	irr_shader->enable();
 
 	if (probes_texture)
 	{
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND); //disabled just to see irradiance
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
 		probes_info.num_probes = probes.size();
 
 		// we send every data necessary
@@ -714,8 +711,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	
 	
 	//renderProbe(probe.pos, 1, probe.sh);
-	if(probes_grid)
-		renderProbes(1);
+	if (probes_grid) {
+		glDepthFunc(GL_LESS);
+		renderProbes(2);
+	}
 	else {
 		glDepthMask(GL_TRUE);
 		glDisable(GL_BLEND);
@@ -1256,10 +1255,10 @@ void SCN::Renderer::captureProbe(sProbe& p)
 {
 	static FloatImage images[6]; //here we will store the six views
 
-	if (!irr_fbo)
+	if (!irr_fbo || irr_fbo->height != irradiance_capture_size)
 	{
 		irr_fbo = new GFX::FBO();
-		irr_fbo->create(64, 64, 1, GL_RGB, GL_FLOAT, false); 
+		irr_fbo->create(irradiance_capture_size, irradiance_capture_size, 1, GL_RGB, GL_FLOAT, false);
 	}
 	Camera cam;
 	//set the fov to 90 and the aspect to 1
@@ -1311,8 +1310,9 @@ void SCN::Renderer::captureProbes()
 	sh_data = new SphericalHarmonics[probes_info.dim.x * probes_info.dim.y * probes_info.dim.z];
 
 	//here we fill the data of the array with our probes in x,y,z order
-	for (int i = 0; i < probes.size(); ++i)
+	for (int i = 0; i < probes.size(); ++i) {
 		sh_data[i] = probes[i].sh;
+	}
 
 	//now upload the data to the GPU as a texture
 	probes_texture->upload(GL_RGB, GL_FLOAT, false, (uint8*)sh_data);
@@ -1387,9 +1387,9 @@ void Renderer::showUI()
 	if (ImGui::TreeNode("Shadow OPTIONS")) {
 		ImGui::Checkbox("Remove Shadows", &skip_shadows);
 		// Create a slider for the exponent
-		if (ImGui::SliderInt("Shadowmap Size", &power_of_two, 7, 12)) {
+		if (ImGui::SliderInt("Shadowmap Size", &power_of_two_shadowmap, 7, 12)) {
 			// Calculate the actual shadowmap size as a power of two
-			shadow_map_size = (1 << power_of_two);
+			shadow_map_size = (1 << power_of_two_shadowmap);
 		}
 		// Display the actual shadowmap size
 		ImGui::Text("Actual Shadowmap Size: %d", shadow_map_size);
@@ -1423,6 +1423,12 @@ void Renderer::showUI()
 			captureProbes();
 		}
 		ImGui::Checkbox("Render Irradiance Probes", &probes_grid);
+		if (ImGui::SliderInt("Irradiance Capture Size", &power_of_two_irradiance, 4, 8)) {
+			// Calculate the actual shadowmap size as a power of two
+			irradiance_capture_size = (1 << power_of_two_irradiance);
+		}
+		// Display the actual shadowmap size
+		ImGui::Text("Actual Irradiance Capture Size: %d", irradiance_capture_size);
 		ImGui::TreePop();
 }
 }
