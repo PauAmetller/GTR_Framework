@@ -57,6 +57,11 @@ struct sIrradianceInfo {
 	int num_probes;
 };
 
+struct sReflectionProbe {
+	vec3 pos;
+	GFX::Texture* texture = nullptr;
+};
+
 namespace SCN {
 
 	class Prefab;
@@ -97,6 +102,7 @@ namespace SCN {
 		bool deactivate_tonemapper;
 		bool Linear_space;
 		bool probes_grid;
+		bool reflection_probes_grid;
 
 		float ssao_max_distance;
 
@@ -174,6 +180,12 @@ namespace SCN {
 		void renderProbes(float scale);
 		void captureProbe(sProbe& p);
 		void captureProbes();
+
+		void renderReflectionProbe(sReflectionProbe* p, float scale);
+		void renderReflectionProbes(float scale);
+		void captureReflectionProbe(sReflectionProbe* p);
+		void captureReflectionProbes();
+		void capturePlanarReflection(Camera* camera);
 
 		void showUI();
 

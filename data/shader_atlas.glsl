@@ -12,7 +12,9 @@ ssao quad.vs ssao.fs
 blurr quad.vs blurr.fs
 tone_mapper quad.vs tonemapper.fs
 probe basic.vs probe.fs
+reflectionProbe basic.vs reflectionProbe.fs
 irradiance quad.vs irradiance.fs
+planar basic.vs planar.fs
 
 \basic.vs
 
@@ -394,6 +396,36 @@ void main()
 	FragColor = color;
 }
 
+\planar.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec3 v_world_position;
+in vec3 v_normal;
+in vec2 v_uv;
+in vec4 v_color;
+
+uniform sampler2D u_texture;
+uniform vec2 u_iRes;
+uniform vec3 u_camera_position;
+
+out vec4 FragColor;
+
+void main()
+{
+	vec3 E = v_world_position - u_camera_position;
+	E = normalize(E);
+	vec3 N = normalize(v_normal);
+	vec2 uv = gl_FragCoord.xy * u_iRes;
+	uv.x = 1.0 -uv.x;
+	vec3 color = texture( u_texture, uv).xyz;
+	float f = 1.0 - max(0.0, dot(E, -N));
+	FragColor = vec4(color * f, 1.0);
+}
+
+
+
 \probes
 
 const float Pi = 3.141592654;
@@ -465,6 +497,28 @@ void main()
 
 	FragColor = vec4(max(color, vec3(0.0)), 1.0);
 	//FragColor = vec4(color, 1.0);
+}
+
+\reflectionProbe.fs
+
+#version 330 core
+
+in vec3 v_world_position;
+in vec3 v_normal;
+
+uniform vec3 u_camera_position;
+uniform samplerCube u_environment_texture;
+
+out vec4 FragColor;
+
+void main()
+{
+	vec3 N = normalize(v_normal);
+	vec3 E = v_world_position - u_camera_position;
+	vec3 R = reflect(E, N); //for reflection
+	//vec3 = refract(E, N, 0.1); //For refraction
+	vec3 color = textureLod(u_environment_texture, R, 0.0).xyz;
+	FragColor = vec4(max(color, vec3(0.0)), 1.0);
 }
 
 
@@ -820,6 +874,9 @@ void main()
 	if(color.a < u_alpha_cutoff)
 		discard;
 
+	if(v_world_position.y < 0.0)
+		discard;
+
 	if (u_linear_space == LINEAR_SPACE){
 		color.xyz = degamma(color.xyz);
 		emissive = degamma(texture(u_texture_emissive, v_uv).xyz);
@@ -871,7 +928,7 @@ out vec4 FragColor;
 void main()
 {
 	vec3 E = v_world_position - u_camera_position;
-	vec4 color = texture( u_texture, E );
+	vec4 color = textureLod( u_texture, E, 0.0 );
 	FragColor = color;
 }
 

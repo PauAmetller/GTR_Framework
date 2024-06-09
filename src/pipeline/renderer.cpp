@@ -29,6 +29,7 @@ GFX::FBO* illumination = nullptr;
 GFX::FBO* ssao_fbo = nullptr;
 GFX::FBO* ssao_blurr = nullptr;
 GFX::FBO* irr_fbo = nullptr;
+GFX::FBO* reflection_fbo = nullptr;
 
 std::vector<vec3> random_points;
 std::vector<float> weights;
@@ -36,9 +37,14 @@ std::vector<float> weights;
 std::vector<sProbe> probes;
 
 GFX::Texture* probes_texture = nullptr;
+GFX::FBO* planar_reflection_fbo = nullptr;
 
 //a place to store info about the layout of the grid
 sIrradianceInfo probes_info;
+
+std::vector<sReflectionProbe*> reflection_probes;
+
+GFX::Mesh plane;
 
 Renderer::Renderer(const char* shader_atlas_filename)
 {
@@ -64,6 +70,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	deactivate_tonemapper = false;
 	Linear_space = false;
 	probes_grid = false;
+	reflection_probes_grid = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -132,6 +139,10 @@ Renderer::Renderer(const char* shader_atlas_filename)
 					probes_info.delta * Vector3f(x, y, z);
 				probes.push_back(p);
 			}
+	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 0), nullptr }));
+	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 300), nullptr }));
+
+	plane.createPlane(1);
 }
 
 
@@ -294,6 +305,8 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	extractSceneInfo(scene, camera);
 	if (!skip_shadows)
 		generateShadowMaps(camera);
+
+	capturePlanarReflection(camera);
 
 	if (pipeline_mode == ePipelineMode::FORWARD)
 		renderSceneForward(scene, camera);
@@ -708,11 +721,34 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		quad->render(GL_TRIANGLES);
 	}
-	
-	
+
+	if (planar_reflection_fbo)
+	{
+		GFX::Shader* planar_shader = GFX::Shader::getDefaultShader("planar");
+		planar_shader->enable();
+		mat4 model;
+		model.scale(1000, 1000, 1000);
+		planar_shader->setUniform("u_model", model);
+		planar_shader->setUniform("u_iRes", vec2(1.0/size.x, 1.0/size.y));
+		cameraToShader(camera, planar_shader);
+		planar_shader->setTexture("u_texture", planar_reflection_fbo->color_textures[0], 0);
+		plane.render(GL_TRIANGLES);
+		planar_shader->disable();
+	}
+
 	//renderProbe(probe.pos, 1, probe.sh);
 	if (probes_grid) {
 		renderProbes(2);
+	}
+	else {
+		glDepthMask(GL_TRUE);
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
+
+	if (reflection_probes_grid) {
+		renderReflectionProbes(10.0);
 	}
 	else {
 		glDepthMask(GL_TRUE);
@@ -1223,7 +1259,6 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
-	glDepthFunc(GL_LESS);
 
 	GFX::Shader* shader = GFX::Shader::Get("probe");
 	if (!shader)
@@ -1238,7 +1273,8 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	shader->setUniform3Array("u_coeffs", shs.coeffs[0].v, 9);
 	sphere.render(GL_TRIANGLES);
 	shader->disable();
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	glDepthFunc(GL_LESS);
 	glEnable(GL_DEPTH_TEST);
 }
 
@@ -1260,6 +1296,7 @@ void SCN::Renderer::captureProbe(sProbe& p)
 		irr_fbo = new GFX::FBO();
 		irr_fbo->create(irradiance_capture_size, irradiance_capture_size, 1, GL_RGB, GL_FLOAT, false);
 	}
+
 	Camera cam;
 	//set the fov to 90 and the aspect to 1
 	cam.setPerspective(90, 1, 0.1, 1000);
@@ -1326,6 +1363,109 @@ void SCN::Renderer::captureProbes()
 	delete[] sh_data;
 }
 
+
+void SCN::Renderer::renderReflectionProbe(sReflectionProbe* p, float scale)
+{
+	Camera* camera = Camera::current;
+
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+
+	GFX::Shader* shader = GFX::Shader::Get("reflectionProbe");
+	if (!shader)
+		return;
+	shader->enable();
+
+	GFX::Texture* texture = p->texture ? p->texture : skybox_cubemap;
+	if(!texture)
+		return;
+
+	Matrix44 m;
+	m.setTranslation(p->pos.x, p->pos.y, p->pos.z);
+	m.scale(scale, scale, scale);
+	shader->setUniform("u_model", m);
+	cameraToShader(camera, shader);
+	shader->setTexture("u_environment_texture", texture, 0);
+	shader->setUniform("u_camera_position", camera->eye);
+	sphere.render(GL_TRIANGLES);
+	shader->disable();
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_DEPTH_TEST);
+}
+
+void SCN::Renderer::renderReflectionProbes(float scale)
+{
+	for (auto& ref : reflection_probes)
+		renderReflectionProbe(ref, scale);
+}
+
+void SCN::Renderer::captureReflectionProbe(sReflectionProbe* p)
+{
+	if (!p->texture)
+	{
+		p->texture = new GFX::Texture();
+		p->texture->createCubemap(128, 128, nullptr, GL_RGB, GL_HALF_FLOAT, true);
+	}
+	if (!reflection_fbo)
+		reflection_fbo = new GFX::FBO();
+
+	Camera cam;
+	//set the fov to 90 and the aspect to 1
+	cam.setPerspective(90, 1, 0.1, 1000);
+
+	for (int i = 0; i < 6; ++i) //for every cubemap face
+	{
+		//compute camera orientation using defined vectors
+		vec3 eye = p->pos;
+		vec3 front = cubemapFaceNormals[i][2];
+		vec3 center = p->pos + front;
+		vec3 up = cubemapFaceNormals[i][1];
+		cam.lookAt(eye, center, up);
+		cam.enable();
+
+		reflection_fbo->setTexture(p->texture, i);
+
+		reflection_fbo->bind();
+		renderSceneForward(scene, &cam);
+		reflection_fbo->unbind();
+	}
+	//generate the mipmaps
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	p->texture->generateMipmaps();
+}
+
+void SCN::Renderer::captureReflectionProbes()
+{
+	for (auto p : reflection_probes)
+		captureReflectionProbe(p);
+}
+
+void SCN::Renderer::capturePlanarReflection(Camera* camera)
+{
+	vec2 size = CORE::getWindowSize();
+	if (!planar_reflection_fbo)
+	{
+		planar_reflection_fbo = new GFX::FBO();
+		planar_reflection_fbo->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE);
+		planar_reflection_fbo->color_textures[0]->setName("reflection");
+	}
+
+	planar_reflection_fbo->bind();
+
+	Camera cam;
+	cam = *camera;
+
+	cam.eye = camera->eye * vec3(1, -1, 1);
+	cam.center = camera->center * vec3(1, -1, 1);
+	cam.up = camera->up * vec3(1, -1, 1);
+
+	renderSceneForward(scene, &cam);
+
+	planar_reflection_fbo->unbind();
+}
 
 
 void SCN::Renderer::cameraToShader(Camera* camera, GFX::Shader* shader)
@@ -1430,7 +1570,16 @@ void Renderer::showUI()
 		// Display the actual shadowmap size
 		ImGui::Text("Actual Irradiance Capture Size: %d", irradiance_capture_size);
 		ImGui::TreePop();
-}
+	}
+
+	if (ImGui::TreeNode("Reflection OPTIONS")) {
+		if (ImGui::Button("Capture Reflection"))
+		{
+			captureReflectionProbes();
+		}
+		ImGui::Checkbox("Render Reflection Probes", &reflection_probes_grid);
+		ImGui::TreePop();
+	}
 }
 
 #else
