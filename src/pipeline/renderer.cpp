@@ -687,40 +687,40 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			}
 	}
 
+	//if (probes_texture)
+	//{
+	//	glDisable(GL_DEPTH_TEST);
+	//	glEnable(GL_BLEND); //disabled just to see irradiance
+	//	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-	GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
-	assert(irr_shader);
-	irr_shader->enable();
+	//	GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
+	//	assert(irr_shader);
+	//	irr_shader->enable();
 
-	if (probes_texture)
-	{
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND); //disabled just to see irradiance
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	//	probes_info.num_probes = probes.size();
 
-		probes_info.num_probes = probes.size();
+	//	// we send every data necessary
+	//	irr_shader->setUniform("u_irr_start", probes_info.start);
+	//	irr_shader->setUniform("u_irr_end", probes_info.end);
+	//	irr_shader->setUniform("u_irr_dims", probes_info.dim);
+	//	irr_shader->setUniform("u_irr_delta", probes_info.delta);
+	//	irr_shader->setUniform("u_num_probes", (int)probes_info.num_probes);
+	//	irr_shader->setUniform("u_probes_texture", probes_texture, 4);
 
-		// we send every data necessary
-		irr_shader->setUniform("u_irr_start", probes_info.start);
-		irr_shader->setUniform("u_irr_end", probes_info.end);
-		irr_shader->setUniform("u_irr_dims", probes_info.dim);
-		irr_shader->setUniform("u_irr_delta", probes_info.delta);
-		irr_shader->setUniform("u_num_probes", (int)probes_info.num_probes);
-		irr_shader->setUniform("u_probes_texture", probes_texture, 4);
+	//	// you need also pass the distance factor, for now leave it as 0.0
+	//	irr_shader->setUniform("u_irr_normal_distance", 0.0f);
+	//	irr_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+	//	irr_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+	//	irr_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+	//	irr_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
 
-		// you need also pass the distance factor, for now leave it as 0.0
-		irr_shader->setUniform("u_irr_normal_distance", 0.0f);
-		irr_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
-		irr_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
-		irr_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
-		irr_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+	//	irr_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+	//	irr_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	//	irr_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 
-		irr_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-		irr_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-		irr_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-
-		quad->render(GL_TRIANGLES);
-	}
+	//	quad->render(GL_TRIANGLES);
+	//	irr_shader->disable();
+	//}
 
 	if (planar_reflection_fbo)
 	{
@@ -736,9 +736,11 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		planar_shader->disable();
 	}
 
+	//SI FAIG CAPTURE AQUI SI QUE FUNCIONA?!
 	//renderProbe(probe.pos, 1, probe.sh);
 	if (probes_grid) {
 		renderProbes(2);
+		//captureProbes();
 	}
 	else {
 		glDepthMask(GL_TRUE);
@@ -749,6 +751,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	if (reflection_probes_grid) {
 		renderReflectionProbes(10.0);
+		//captureReflectionProbes();
 	}
 	else {
 		glDepthMask(GL_TRUE);
@@ -759,6 +762,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	illumination->unbind();
 
+	/*captureReflectionProbes();
+	reflection_fbo->color_textures[0]->toViewport();*/
 
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
@@ -1423,6 +1428,7 @@ void SCN::Renderer::captureReflectionProbe(sReflectionProbe* p)
 		vec3 front = cubemapFaceNormals[i][2];
 		vec3 center = p->pos + front;
 		vec3 up = cubemapFaceNormals[i][1];
+		
 		cam.lookAt(eye, center, up);
 		cam.enable();
 
