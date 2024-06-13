@@ -15,6 +15,7 @@ probe basic.vs probe.fs
 reflectionProbe basic.vs reflectionProbe.fs
 irradiance quad.vs irradiance.fs
 planar basic.vs planar.fs
+volumetric quad.vs volumetric.fs
 
 \basic.vs
 
@@ -1045,6 +1046,49 @@ void main()
         }
 
     	FragColor = vec4(result / total_weight, 1.0);
+}
+
+\volumetric.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_normal_texture;
+uniform vec3 u_camera_position;
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+uniform bool u_skybox_fog;
+
+uniform vec3 u_ambient_light;
+uniform float u_air_density;
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy * u_iRes.xy;
+	vec3 N = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	N = normalize(N);
+	float depth = texture( u_depth_texture,uv).x;
+	if (u_skybox_fog)
+		if(depth == 1.0)
+			discard;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	float dist = length(u_camera_position - v_world_position);
+	
+	vec3 light = u_ambient_light; //vec3(0.4, 0.45, 0.5);
+	float translucency = min(1.0, dist * u_air_density);
+
+
+	FragColor = vec4(light, translucency); 
 }
 
 \tonemapper.fs

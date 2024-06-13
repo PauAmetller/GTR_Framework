@@ -71,6 +71,8 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	Linear_space = false;
 	probes_grid = false;
 	reflection_probes_grid = false;
+	volumetric_light = false;
+	eliminate_skybox_fog = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -100,6 +102,9 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	kernel_size = 5;
 	sigma = 1.0f;
 	weights = calculate_weights(kernel_size, sigma);
+
+	//Volumetric
+	air_density = 0.001;
 
 	//Tonemapper
 	scale = 1.0;
@@ -290,6 +295,7 @@ void Renderer::generateShadowMaps(Camera* main_camera) {
 			light->shadowmap_view_projection = camera.viewprojection_matrix;
 
 			shadow_maps[shadow_map_index]->unbind();
+			light->shadow_map_index = shadow_map_index;
 
 			if (shadow_map_index < NUM_SHADOW_MAPS - 1)
 				shadow_map_index++;
@@ -498,122 +504,47 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (texture_ssao == NULL)
 		texture_ssao = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
-	GFX::Shader* shader = GFX::Shader::Get("deferred_global");
-
-	assert(shader);
-	shader->enable();
-	GbuffersToShader(gbuffers, shader);
-
-	shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
-	shader->setUniform("u_ao_texture", texture_ssao, 4);
-	shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	shader->setUniform("u_emissive_first", vec3(1.0));
-	shader->setUniform("u_light_type", 0);
-	shader->setUniform("u_linear_factor", ssao_linear);
-	shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
-	quad->render(GL_TRIANGLES);
-
-	shader->disable();
-	
-
 	if (lights.size() && (!skip_lights)) {
 
-		shader = GFX::Shader::Get("deferred_ws");
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_ALWAYS);
+		glEnable(GL_CULL_FACE);
+		glDisable(GL_BLEND);
+
+		GFX::Shader* shader = GFX::Shader::Get("deferred_global");
 
 		assert(shader);
 		shader->enable();
 		GbuffersToShader(gbuffers, shader);
 
-		shader->setUniform("u_ambient_light", vec3(0.0));
+		shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
+		shader->setUniform("u_ao_texture", texture_ssao, 4);
 		shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 		shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-		shader->setUniform("u_emissive_first", vec3(0.0));
+		shader->setUniform("u_emissive_first", vec3(1.0));
+		shader->setUniform("u_light_type", 0);
+		shader->setUniform("u_linear_factor", ssao_linear);
 		shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
-		glEnable(GL_CULL_FACE);
-
-		shadow_map_index = 0;
-		for (LightEntity* light : lights) {
-			lightToShader(light, shader);
-
-			if (light->has_shadow_map) {
-				shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
-				shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
-				shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-				shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
-				if (shadow_map_index < NUM_SHADOW_MAPS - 1)
-					shadow_map_index++;
-				else
-					printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
-			}
-			if (light->light_type == SCN::eLightType::DIRECTIONAL) {
-				shader->setUniform("u_camera_position", camera->eye);
-				shader->setUniform("u_viewprojection", mat4::IDENTITY);
-				shader->setUniform("u_model", mat4::IDENTITY);
-				quad->render(GL_TRIANGLES);
-			}
-			else {
-				cameraToShader(camera, shader);
-				mat4 m;
-				vec3 lightpos = light->root.model.getTranslation();
-				m.setTranslation(lightpos.x, lightpos.y, lightpos.z);
-				m.scale(light->max_distance, light->max_distance, light->max_distance);
-				shader->setUniform("u_model", m);
-				glFrontFace(GL_CW);
-				glEnable(GL_CULL_FACE);
-				sphere.render(GL_TRIANGLES);
-				glDisable(GL_CULL_FACE);
-				glFrontFace(GL_CCW);
-			}
-		}
-
-		glDisable(GL_BLEND);
-		shader->disable();
-	}
-
-	/////////////////////////////////////////////////Rendering Directional with quad.vs and others with basic.vs, but there's a problem with the shadowmap generated the directional and spot light shadows conflict//////////////////////////////////
-	/*if (lights.size() && (!skip_lights)) {
-
-		glEnable(GL_DEPTH_TEST);
-
-		glDepthFunc(GL_ALWAYS);
-		glEnable(GL_BLEND);
-		glEnable(GL_CULL_FACE);
-
-		shader->setUniform("u_ambient_light", vec3(0.0));
-		shader->setUniform("u_emissive_first", vec3(1.0));
-
-		shadow_map_index = 0;
 		if (directional_lights.size()) {
 
 			for (LightEntity* light : directional_lights) {
 				lightToShader(light, shader);
 
-				if (light->has_shadow_map) {
-					shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
-					shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
-					shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-					shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
-					if (shadow_map_index < NUM_SHADOW_MAPS - 1)
-						shadow_map_index++;
-					else
-						printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
-				}
-
 				quad->render(GL_TRIANGLES);
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE);
+				shader->setUniform("u_ambient_light", vec3(0.0));
+				shader->setUniform("u_emissive_first", vec3(0.0));
 			}
-
-			glDisable(GL_BLEND);
-			shader->disable();
 		}
-
+		else {
+			quad->render(GL_TRIANGLES);
+		}
+		shader->disable();
 		
 		if (point_and_spot_lights.size()) {
-			//draw the lights
+
 			shader = GFX::Shader::Get("deferred_ws");
 
 			assert(shader);
@@ -646,17 +577,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 				lightToShader(light, shader);
 
-				if (light->has_shadow_map) {
-					shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
-					shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
-					shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-					shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
-					if (shadow_map_index < NUM_SHADOW_MAPS - 1)
-						shadow_map_index++;
-					else
-						printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
-				}
-
 				sphere.render(GL_TRIANGLES);
 			}
 			glFrontFace(GL_CCW);
@@ -668,8 +588,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			shader->disable();
 		}
 
-	}*/
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	}
 
 	glDepthFunc(GL_LESS);
 	glDepthMask(GL_TRUE);
@@ -728,6 +647,31 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->disable();
 	}
 
+	if (volumetric_light) {
+
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		GFX::Shader* volumetric_shader = GFX::Shader::Get("volumetric");
+		assert(volumetric_shader);
+		volumetric_shader->enable();
+		cameraToShader(camera, volumetric_shader);
+		volumetric_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 0);
+		volumetric_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+		volumetric_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_fbo->color_textures[0]->width, 1.0 / (float)ssao_fbo->color_textures[0]->height));
+		volumetric_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+		volumetric_shader->setUniform("u_skybox_fog", eliminate_skybox_fog);
+		volumetric_shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
+		volumetric_shader->setUniform("u_air_density", air_density);
+		lightToShader(moon_light, volumetric_shader);
+		quad->render(GL_TRIANGLES);
+		volumetric_shader->disable();
+		ssao_fbo->unbind();
+	}
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_DEPTH_TEST);
 
 	if (planar_reflection_fbo)
 	{
@@ -771,7 +715,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			illumination->color_textures[0]->toViewport();
 		}
 		else {
-			shader = GFX::Shader::Get("tone_mapper");
+			GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
 			shader->enable();
 			shader->setUniform("u_scale", scale);
 			shader->setUniform("u_average_lum", average_lum);
@@ -1221,17 +1165,6 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 		for (LightEntity* light : lights) {
 			lightToShader(light, shader);
 
-			if (light->has_shadow_map) {
-				shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
-				shader->setUniform("u_shadow_map", shadow_maps[shadow_map_index]->depth_texture, 8);
-				shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
-				shader->setUniform("u_shadow_bias", light->shadow_bias);
-				if (shadow_map_index < NUM_SHADOW_MAPS - 1)
-					shadow_map_index++;
-				else
-					printf("Max number of shadow maps achieved, incrise it to be able to have more shadow maps (NUM_SHADOW_MAPS)");
-			}
-
 			mesh->render(GL_TRIANGLES);
 			glEnable(GL_BLEND);
 			shader->setUniform("u_ambient_light", vec3(0.0));
@@ -1489,6 +1422,13 @@ void SCN::Renderer::lightToShader(LightEntity* light, GFX::Shader* shader)
 	shader->setUniform("u_light_cone_info", vec2(cos(light->cone_info.x * DEG2RAD), cos(light->cone_info.y * DEG2RAD)));
 	shader->setUniform("u_light_front", light->root.model.frontVector().normalize());
 	shader->setUniform("u_PBR", !Remove_PBR ? 1 : 0);
+
+	if (light->has_shadow_map) {
+		shader->setUniform("u_light_cast_shadow", !skip_shadows ? 1 : 0);
+		shader->setUniform("u_shadow_map", shadow_maps[light->shadow_map_index]->depth_texture, 8);
+		shader->setUniform("u_shadow_map_view_projection", light->shadowmap_view_projection);
+		shader->setUniform("u_shadow_bias", float(light->shadow_bias + 0.002));
+	}
 }
 
 void SCN::Renderer::GbuffersToShader(GFX::FBO* gbuffers, GFX::Shader* shader) {
@@ -1586,6 +1526,9 @@ void Renderer::showUI()
 		ImGui::Checkbox("Render Reflection Probes", &reflection_probes_grid);
 		ImGui::TreePop();
 	}
+	ImGui::Checkbox("Add volumetric light", &volumetric_light);
+	ImGui::Checkbox("Eliminate Skybox Fog", &eliminate_skybox_fog);
+	ImGui::DragFloat("Air density", &air_density, 0.00001f, 0.0f, 1.0f, "%.5f");
 }
 
 #else

@@ -103,6 +103,8 @@ namespace SCN {
 		bool Linear_space;
 		bool probes_grid;
 		bool reflection_probes_grid;
+		bool volumetric_light;
+		bool eliminate_skybox_fog;
 
 		float ssao_max_distance;
 
@@ -111,6 +113,9 @@ namespace SCN {
 		int power_of_two_shadowmap = 10; //exponent for shadow_map_size
 		int irradiance_capture_size;
 		int power_of_two_irradiance = 4; //exponent for irradiance_capture_size
+
+		//Volumetric
+		float air_density;
 
 		//SSAO blur
 		int kernel_size;

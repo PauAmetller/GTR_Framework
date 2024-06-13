@@ -27,6 +27,7 @@ namespace SCN {
 
 		bool has_shadow_map;
 		mat4 shadowmap_view_projection;
+		int shadow_map_index;
 
 		ENTITY_METHODS(LightEntity, LIGHT, 14,4);
 
