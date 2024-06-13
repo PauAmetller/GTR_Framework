@@ -483,20 +483,13 @@ void main()
 	vec3 color;
 	vec3 N = normalize(v_normal);
 	SH9Color sh;
-	sh.c[0] = u_coeffs[0];
-	sh.c[1] = u_coeffs[1];
-	sh.c[2] = u_coeffs[2];
-	sh.c[3] = u_coeffs[3];
-	sh.c[4] = u_coeffs[4];
-	sh.c[5] = u_coeffs[5];
-	sh.c[6] = u_coeffs[6];
-	sh.c[7] = u_coeffs[7];
-	sh.c[8] = u_coeffs[8];
+	for(int i = 0; i < 9; ++i)
+		sh.c[i] = u_coeffs[i];
 
 	color.xyz = ComputeSHIrradiance(N, sh);
 
-	FragColor = vec4(max(color, vec3(0.0)), 1.0);
-	//FragColor = vec4(color, 1.0);
+	//FragColor = vec4(max(color, vec3(0.0)), 1.0);
+	FragColor = vec4(color, 1.0);
 }
 
 \reflectionProbe.fs

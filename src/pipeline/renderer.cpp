@@ -404,6 +404,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	camera->enable();
 
 	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 
 	glClearColor(0, 0, 0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -420,6 +421,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	gbuffers->unbind();
 	
+	// SSAO Pass
 	ssao_fbo->bind();
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -429,17 +431,16 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	GFX::Shader* ssao_shader = GFX::Shader::Get("ssao");
 	assert(ssao_shader);
 	ssao_shader->enable();
+	cameraToShader(camera, ssao_shader);
 	ssao_shader->setUniform("u_radius", ssao_radius);
 	ssao_shader->setUniform("u_max_distance", ssao_max_distance);
 	ssao_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 0);
 	ssao_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
 	ssao_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_fbo->color_textures[0]->width, 1.0 / (float)ssao_fbo->color_textures[0]->height));
 	ssao_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	ssao_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	ssao_shader->setUniform3Array("u_points", (float*) &random_points[0], random_points.size());
 	ssao_shader->setUniform("u_linear_factor", ssao_linear);
 	ssao_shader->setUniform("u_front", camera->front);
-	ssao_shader->setUniform("u_camera_position", camera->eye);
 	ssao_shader->setUniform("u_far", camera->far_plane);
 	ssao_shader->setUniform("u_near", camera->near_plane);
 	if(ssao_mode == eSSAOMODE::SSAO_PLUS)
@@ -447,9 +448,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	else
 		ssao_shader->setUniform("u_ssao_plus", 0);
 	quad->render(GL_TRIANGLES);
-
+	ssao_shader->disable();
 	ssao_fbo->unbind();
 
+	// SSAO Blur Pass
 	ssao_blurr->bind();
 	glClearColor(1, 1, 1, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -462,10 +464,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	ssao_blurr_shader->setUniform("u_texture", ssao_fbo->color_textures[0], 0);
 	ssao_blurr_shader->setUniform("u_kernel_size", kernel_size);
 	ssao_blurr_shader->setUniform1Array("u_weight", (float*) &weights[0], kernel_size);
-
-	//ssao_blurr_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_blurr->color_textures[0]->width, 1.0 / (float)ssao_blurr->color_textures[0]->height));
 	quad->render(GL_TRIANGLES);
-	//ssao_blurr_shader->disable();
+	ssao_blurr_shader->disable();
 	ssao_blurr->unbind();
 
 	ssao_fbo->color_textures[0]->bind();
@@ -529,7 +529,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
 		glDisable(GL_DEPTH_TEST);
-		glDepthFunc(GL_LESS);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
 		glEnable(GL_CULL_FACE);
@@ -671,6 +670,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	glDepthFunc(GL_LESS);
 	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
@@ -721,6 +721,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		quad->render(GL_TRIANGLES);
 	}
+
+	irr_shader->disable();
 
 	if (planar_reflection_fbo)
 	{
@@ -1256,6 +1258,7 @@ void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 	glEnable(GL_CULL_FACE);
 
 	GFX::Shader* shader = GFX::Shader::Get("probe");
