@@ -669,8 +669,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}*/
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	glDepthMask(GL_FALSE);
-	glEnable(GL_BLEND);
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
 
 	// Sort by distance_to_camera from far to near
 	std::sort(alphaRenderables.begin(), alphaRenderables.end(), [](Renderable& a, Renderable& b) {return (a.distance_to_camera > b.distance_to_camera); });
@@ -709,7 +709,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->setUniform("u_probes_texture", probes_texture, 4);
 
 		// you need also pass the distance factor, for now leave it as 0.0
-		irr_shader->setUniform("u_irr_normal_distance", 0.0f);
+		irr_shader->setUniform("u_irr_normal_distance", 5.0f);
 		irr_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
 		irr_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
 		irr_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
@@ -740,22 +740,20 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (probes_grid) {
 		renderProbes(2);
 	}
-	else {
-		glDepthMask(GL_TRUE);
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_CULL_FACE);
-	}
+	//else {
+	//	glDisable(GL_BLEND);
+	//	glDisable(GL_DEPTH_TEST);
+	//	glEnable(GL_CULL_FACE);
+	//}
 
 	if (reflection_probes_grid) {
 		renderReflectionProbes(10.0);
 	}
-	else {
-		glDepthMask(GL_TRUE);
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_CULL_FACE);
-	}
+	//else {
+	//	glDisable(GL_BLEND);
+	//	glDisable(GL_DEPTH_TEST);
+	//	glEnable(GL_CULL_FACE);
+	//}
 
 	illumination->unbind();
 
@@ -1563,7 +1561,7 @@ void Renderer::showUI()
 			captureProbes();
 		}
 		ImGui::Checkbox("Render Irradiance Probes", &probes_grid);
-		if (ImGui::SliderInt("Irradiance Capture Size", &power_of_two_irradiance, 4, 8)) {
+		if (ImGui::SliderInt("Irradiance Capture Size", &power_of_two_irradiance, 2, 7)) {
 			// Calculate the actual shadowmap size as a power of two
 			irradiance_capture_size = (1 << power_of_two_irradiance);
 		}

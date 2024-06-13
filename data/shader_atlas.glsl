@@ -655,9 +655,9 @@ out vec4 FragColor;
 void main()
 {
 	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
-	vec4 color = texture( u_color_texture, v_uv);
-	vec3 N = texture( u_normal_texture, v_uv ).xyz * 2.0 - vec3(1.0);
-	float depth = texture( u_depth_texture, v_uv).x;
+	vec4 color = texture( u_color_texture, uv);
+	vec3 N = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	float depth = texture( u_depth_texture, uv).x;
 
 	if(depth == 1.0)
 		discard;
@@ -699,7 +699,7 @@ void main()
 
 	//now we can use the coefficients to compute the irradiance
 	vec3 irradiance = ComputeSHIrradiance( N, sh );
-
+	
 	FragColor = vec4(irradiance, 1.0);
 }
 
