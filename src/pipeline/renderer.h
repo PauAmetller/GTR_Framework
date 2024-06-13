@@ -110,7 +110,7 @@ namespace SCN {
 		int shadow_map_size;
 		int power_of_two_shadowmap = 10; //exponent for shadow_map_size
 		int irradiance_capture_size;
-		int power_of_two_irradiance = 6; //exponent for shadow_map_size
+		int power_of_two_irradiance = 4; //exponent for irradiance_capture_size
 
 		//SSAO blur
 		int kernel_size;

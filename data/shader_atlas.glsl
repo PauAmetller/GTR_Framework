@@ -486,9 +486,8 @@ void main()
 	for(int i = 0; i < 9; ++i)
 		sh.c[i] = u_coeffs[i];
 
-	color.xyz = ComputeSHIrradiance(N, sh);
+	color.xyz = max(vec3(0.0), ComputeSHIrradiance(N, sh));
 
-	//FragColor = vec4(max(color, vec3(0.0)), 1.0);
 	FragColor = vec4(color, 1.0);
 }
 

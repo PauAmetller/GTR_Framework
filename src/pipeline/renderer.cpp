@@ -121,6 +121,8 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	delta.z /= (probes_info.dim.z - 1);
 	probes_info.delta = delta; //store
 
+	probes.clear();
+
 	//lets compute the centers
 	//pay attention at the order at which we add them
 	for (int z = 0; z < probes_info.dim.z; ++z)
@@ -139,6 +141,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 					probes_info.delta * Vector3f(x, y, z);
 				probes.push_back(p);
 			}
+
 	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 0), nullptr }));
 	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 300), nullptr }));
 
@@ -688,12 +691,13 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}
 
 
-	GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
-	assert(irr_shader);
-	irr_shader->enable();
-
 	if (probes_texture)
 	{
+
+		GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
+		assert(irr_shader);
+		irr_shader->enable();
+
 		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND); //disabled just to see irradiance
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -709,7 +713,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->setUniform("u_probes_texture", probes_texture, 4);
 
 		// you need also pass the distance factor, for now leave it as 0.0
-		irr_shader->setUniform("u_irr_normal_distance", 5.0f);
+		irr_shader->setUniform("u_irr_normal_distance", 0.0f);
 		irr_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
 		irr_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
 		irr_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
@@ -720,9 +724,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 
 		quad->render(GL_TRIANGLES);
+
+		irr_shader->disable();
 	}
 
-	irr_shader->disable();
 
 	if (planar_reflection_fbo)
 	{
