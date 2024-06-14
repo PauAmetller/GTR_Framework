@@ -538,6 +538,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	ssao_shader->disable();
 	ssao_fbo->unbind();
 
+
 	// SSAO Blur Pass
 	ssao_blurr->bind();
 	glClearColor(1, 1, 1, 1);
