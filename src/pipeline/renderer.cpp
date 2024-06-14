@@ -807,18 +807,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	final_fbo->bind();
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
-		if (deactivate_tonemapper) {
-			illumination->color_textures[0]->toViewport();
-		}
-		else {
-			GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
-			shader->enable();
-			shader->setUniform("u_scale", scale);
-			shader->setUniform("u_average_lum", average_lum);
-			shader->setUniform("u_lumwhite2", lumwhite2);
-			shader->setUniform("u_igamma", float(1.0 / igamma));
-			illumination->color_textures[0]->toViewport(shader);
-		}
+		illumination->color_textures[0]->toViewport();
 	if (show_gbuffer == eShowGBuffer::COLOR)
 		gbuffers->color_textures[0]->toViewport();
 	if (show_gbuffer == eShowGBuffer::NORMAL)
@@ -884,6 +873,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			volumetric_fbo->color_textures[0]->toViewport();
 		}
 	}
+
 	if (show_ssao)
 		if (!blurr)
 			ssao_fbo->color_textures[0]->toViewport();
@@ -892,7 +882,18 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	final_fbo->unbind();
 
-	final_fbo->color_textures[0]->toViewport();
+	if(!deactivate_tonemapper){
+		GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
+		shader->enable();
+		shader->setUniform("u_scale", scale);
+		shader->setUniform("u_average_lum", average_lum);
+		shader->setUniform("u_lumwhite2", lumwhite2);
+		shader->setUniform("u_igamma", float(1.0 / igamma));
+		final_fbo->color_textures[0]->toViewport(shader);
+	}
+	else {
+		final_fbo->color_textures[0]->toViewport();
+	}
 
 }
 

@@ -130,7 +130,6 @@ namespace SCN {
 
 		ePipelineMode pipeline_mode;
 		eShowGBuffer show_gbuffer;
-		eProcessing processing_mode;
 		eSSAOMODE ssao_mode;
 
 		GFX::Texture* skybox_cubemap;
