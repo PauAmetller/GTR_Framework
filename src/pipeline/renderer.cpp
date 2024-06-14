@@ -440,7 +440,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	camera->enable();
 
 	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS);
 
 	glClearColor(0, 0, 0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -525,6 +524,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	ssao_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
 	ssao_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_fbo->color_textures[0]->width, 1.0 / (float)ssao_fbo->color_textures[0]->height));
 	ssao_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	ssao_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 	ssao_shader->setUniform3Array("u_points", (float*)&random_points[0], random_points.size());
 	ssao_shader->setUniform("u_linear_factor", ssao_linear);
 	ssao_shader->setUniform("u_front", camera->front);
@@ -537,7 +537,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	quad->render(GL_TRIANGLES);
 	ssao_shader->disable();
 	ssao_fbo->unbind();
-
 
 	// SSAO Blur Pass
 	ssao_blurr->bind();
