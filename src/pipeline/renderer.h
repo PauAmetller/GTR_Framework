@@ -104,6 +104,7 @@ namespace SCN {
 		bool probes_grid;
 		bool reflection_probes_grid;
 		bool volumetric_light;
+		bool decal;
 
 		float ssao_max_distance;
 
@@ -143,6 +144,7 @@ namespace SCN {
 		std::vector<LightEntity*> directional_lights; //////////
 		std::vector<LightEntity*> point_and_spot_lights; //////////
 		LightEntity* moon_light; ////////
+		std::vector<DecalEntity*> decals;
 
 		//SSAO
 		float ssao_radius;

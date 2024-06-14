@@ -303,6 +303,15 @@ bool SCN::PrefabEntity::testRay(const Ray& ray, Vector3f& coll, float max_dist)
 	return root.testRay(ray, coll, 0xFF, max_dist);
 }
 
+void SCN::DecalEntity::configure(cJSON* json)
+{
+	if (cJSON_GetObjectItem(json, "texture"))
+	{
+		texture = cJSON_GetObjectItem(json, "texture")->valuestring;
+	}
+}
+
+
 SCN::UnknownEntity::UnknownEntity()
 {
 	data = nullptr;

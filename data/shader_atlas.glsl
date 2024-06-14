@@ -19,6 +19,7 @@ planar basic.vs planar.fs
 volumetric quad.vs volumetric.fs
 //fog for all lights
 volumetric_lights quad.vs volumetric_lights.fs
+decals basic.vs decal.fs
 
 \basic.vs
 
@@ -1315,3 +1316,56 @@ void main()
 	gl_FragColor = vec4( rgb, color.a );
 
 }
+
+
+\decal.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_normal_texture;
+uniform sampler2D u_color_texture;
+uniform sampler2D u_emissive_occlusion_texture;
+uniform sampler2D u_decal_texture;
+uniform vec3 u_camera_position;
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+
+uniform mat4 u_imodel;
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy * u_iRes.xy;
+
+	float depth = texture( u_depth_texture, uv).x;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	vec3 localpos = (u_imodel * vec4(v_world_position, 1.0)).xyz;
+
+	//if outside of the volume
+	if(     localpos.x < -0.5 || localpos.x > 0.5 ||
+    		localpos.y < -0.5 || localpos.y > 0.5 ||
+    		localpos.z < -0.5 || localpos.z > 0.5 )
+		discard;
+
+	//use XZ as UVs, remap to 0..1 range
+	vec2 decal_uv = localpos.xz + vec2(0.5);
+
+	vec4 color = texture( u_decal_texture, decal_uv);
+
+	//skip transparent pixels
+	if(color.a == 0.0)
+		discard;
+
+	FragColor = color; 
+}
+
