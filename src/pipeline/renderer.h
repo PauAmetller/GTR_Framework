@@ -104,7 +104,6 @@ namespace SCN {
 		bool probes_grid;
 		bool reflection_probes_grid;
 		bool volumetric_light;
-		bool eliminate_skybox_fog;
 
 		float ssao_max_distance;
 

@@ -30,6 +30,7 @@ GFX::FBO* ssao_fbo = nullptr;
 GFX::FBO* ssao_blurr = nullptr;
 GFX::FBO* irr_fbo = nullptr;
 GFX::FBO* reflection_fbo = nullptr;
+GFX::FBO* volumetric_fbo = nullptr;
 
 std::vector<vec3> random_points;
 std::vector<float> weights;
@@ -72,7 +73,6 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	probes_grid = false;
 	reflection_probes_grid = false;
 	volumetric_light = false;
-	eliminate_skybox_fog = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -104,7 +104,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	weights = calculate_weights(kernel_size, sigma);
 
 	//Volumetric
-	air_density = 0.001;
+	air_density = 0.004;
 
 	//Tonemapper
 	scale = 1.0;
@@ -392,7 +392,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}
 
 	//ssao
-
 	if (!ssao_fbo || (ssao_fbo->width != size.x || ssao_fbo->height != size.y))
 	{
 		ssao_fbo = new GFX::FBO();
@@ -407,6 +406,13 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		ssao_blurr->create(size.x, size.y, 1, GL_RGB, GL_UNSIGNED_BYTE, false);
 		ssao_blurr->color_textures[0]->setName("SSAO_BLURR");
 		weights = calculate_weights(kernel_size, sigma);
+	}
+
+	//Volumetric
+	if (!volumetric_fbo || (volumetric_fbo->width != size.x/2 || volumetric_fbo->height != size.y/2))
+	{
+		volumetric_fbo = new GFX::FBO();
+		volumetric_fbo->create(size.x/2, size.y/2, 1, GL_RGBA, GL_UNSIGNED_BYTE, false);
 	}
 
 	gbuffers->bind();
@@ -647,11 +653,13 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->disable();
 	}
 
-	if (volumetric_light) {
+	if (volumetric_fbo) {
 
+		volumetric_fbo->bind();
+
+		glClear(GL_COLOR_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDepthFunc(GL_ALWAYS);
 
 		GFX::Shader* volumetric_shader = GFX::Shader::Get("volumetric");
 		assert(volumetric_shader);
@@ -659,21 +667,31 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		cameraToShader(camera, volumetric_shader);
 		volumetric_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 0);
 		volumetric_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
-		volumetric_shader->setUniform("u_iRes", vec2(1.0 / (float)ssao_fbo->color_textures[0]->width, 1.0 / (float)ssao_fbo->color_textures[0]->height));
+		volumetric_shader->setUniform("u_iRes", vec2(1.0 / volumetric_fbo->width, 1.0 / volumetric_fbo->height));
 		volumetric_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-		volumetric_shader->setUniform("u_skybox_fog", eliminate_skybox_fog);
 		volumetric_shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
 		volumetric_shader->setUniform("u_air_density", air_density);
+		volumetric_shader->setUniform("u_time", (float)getTime() * 0.001f);
 		lightToShader(moon_light, volumetric_shader);
 		quad->render(GL_TRIANGLES);
+
+		/*for (LightEntity* light : lights) {
+
+			lightToShader(light, volumetric_shader);
+			quad->render(GL_TRIANGLES);
+			volumetric_shader->setUniform("u_ambient_light", vec3(0.0));
+		}*/
+
 		volumetric_shader->disable();
-		ssao_fbo->unbind();
+		volumetric_fbo->unbind();
+
+		glDisable(GL_BLEND);
 	}
 
 	glDepthFunc(GL_LESS);
 	glEnable(GL_DEPTH_TEST);
 
-	if (planar_reflection_fbo)
+	if (planar_reflection_fbo && show_gbuffer != eShowGBuffer::DEPTH && show_gbuffer != eShowGBuffer::GBUFFERS)
 	{
 		GFX::Shader* planar_shader = GFX::Shader::getDefaultShader("planar");
 		planar_shader->enable();
@@ -742,12 +760,27 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		//set an area of the screen and render fullscreen quad
 		glViewport(0, size.y * 0.5, size.x * 0.5, size.y * 0.5);
 		gbuffers->color_textures[0]->toViewport(); //colorbuffer
+		if (volumetric_light) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			volumetric_fbo->color_textures[0]->toViewport();
+		}
 
 		glViewport(size.x * 0.5, size.y * 0.5, size.x * 0.5, size.y * 0.5);
 		gbuffers->color_textures[1]->toViewport(); //normalbuffer
+		if (volumetric_light) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			volumetric_fbo->color_textures[0]->toViewport();
+		}
 
 		glViewport(size.x * 0.5, 0.0, size.x * 0.5, size.y * 0.5);
 		gbuffers->color_textures[2]->toViewport(); //emissivelbuffer
+		if (volumetric_light) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			volumetric_fbo->color_textures[0]->toViewport();
+		}
 
 		//for the depth remember to linearize when displaying it
 		glViewport(0, 0, size.x * 0.5, size.y * 0.5);
@@ -756,13 +789,25 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		vec2 near_far = vec2(camera->near_plane, camera->far_plane);
 		depth_shader->setUniform("u_camera_nearfar", near_far);
 		gbuffers->depth_texture->toViewport(depth_shader);
+		if (volumetric_light) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			volumetric_fbo->color_textures[0]->toViewport();
+		}
 
 		//set the viewport back to full screen
 		glViewport(0, 0, size.x, size.y);
 
 	}
-	if(show_ssao)
-		if(!blurr)
+	else {
+		if (volumetric_light) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			volumetric_fbo->color_textures[0]->toViewport();
+		}
+	}
+	if (show_ssao)
+		if (!blurr)
 			ssao_fbo->color_textures[0]->toViewport();
 		else
 			ssao_blurr->color_textures[0]->toViewport();
@@ -1527,7 +1572,6 @@ void Renderer::showUI()
 		ImGui::TreePop();
 	}
 	ImGui::Checkbox("Add volumetric light", &volumetric_light);
-	ImGui::Checkbox("Eliminate Skybox Fog", &eliminate_skybox_fog);
 	ImGui::DragFloat("Air density", &air_density, 0.00001f, 0.0f, 1.0f, "%.5f");
 }
 
