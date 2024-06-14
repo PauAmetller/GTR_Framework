@@ -167,7 +167,10 @@ namespace SCN {
 		void renderSceneForward(SCN::Scene* scene, Camera* camera);
 		void renderSceneDeferred(SCN::Scene* scene, Camera* camera);
 
-		void renderPostFx(GFX::Texture* final_frame);
+		void renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffer);
+
+		//PostProssesing shaders
+		void applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera);
 
 		//render the skybox
 		void renderSkybox(GFX::Texture* cubemap);

@@ -20,6 +20,7 @@ volumetric quad.vs volumetric.fs
 //fog for all lights
 volumetric_lights quad.vs volumetric_lights.fs
 decals basic.vs decal.fs
+motion_blurr quad.vs motion_blurr.fs
 
 \basic.vs
 
@@ -1051,6 +1052,40 @@ void main()
 
     	FragColor = vec4(result / total_weight, 1.0);
 }
+
+\motion_blurr.fs
+
+#version 330 core
+
+uniform sampler2D u_texture;
+uniform sampler2D u_depth_texture;
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection_prev;
+uniform vec2 u_iRes;
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy * u_iRes.xy;
+	float depth = texture( u_depth_texture, uv).x;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 v_world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	vec4 prev = u_viewprojection_prev * vec4(v_world_position, 1.0);
+	prev.xyz /= prev.w;
+	prev.xy = (prev.xy + vec2(1.0)) / 2.0;
+
+	vec4 color = vec4(0.0);
+
+	for(int i = 0; i < 10; ++i)
+		color += texture(u_texture, mix(uv, prev.xy, i/9.0));
+	color /= 9.0;
+	FragColor = color;
+}
+
 
 \Noise
 

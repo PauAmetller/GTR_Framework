@@ -357,11 +357,12 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 		final_fbo->bind();
 			renderSceneForward(scene, camera);
 		final_fbo->unbind();
+		renderPostFx(final_fbo->color_textures[0], final_fbo->depth_texture);
 	}
-	else if (pipeline_mode == ePipelineMode::DEFERRED)
+	else if (pipeline_mode == ePipelineMode::DEFERRED) {
 		renderSceneDeferred(scene, camera);
-
-	renderPostFx(final_fbo->color_textures[0]);
+		renderPostFx(final_fbo->color_textures[0], gbuffers->depth_texture);
+	}
 
 	opaqueRenderables.clear();
 	alphaRenderables.clear();
@@ -906,10 +907,14 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	final_fbo->unbind();
 }
 
-void Renderer::renderPostFx(GFX::Texture* final_frame) 
+
+//Create a loop to apply as many postProcessing as you need
+void Renderer::renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffer)
 {
 
 	vec2 size = CORE::getWindowSize();
+	Camera* camera = Camera::current;
+	vec2 iRes = vec2(1.0 / (float)size.x, 1.0 / (float)size.y);
 
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
@@ -933,11 +938,24 @@ void Renderer::renderPostFx(GFX::Texture* final_frame)
 
 	postFxB_fbo->bind();
 
-	postFxA_fbo->color_textures[0]->toViewport();
+	applyMotionBlurr(postFxA_fbo->color_textures[0], depth_buffer, iRes, camera);
 
 	postFxB_fbo->unbind();
 
 	postFxB_fbo->color_textures[0]->toViewport();
+}
+
+
+//Post Processing shaders
+void Renderer::applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera) {
+	GFX::Shader* shader = GFX::Shader::Get("motion_blurr");
+	shader->enable();
+	shader->setUniform("u_iRes", iRes);
+	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	shader->setUniform("u_viewprojection_prev", viewprojection_previous_frame);
+	shader->setUniform("u_depth_texture", depth_buffer, 1);
+	viewprojection_previous_frame = camera->viewprojection_matrix;
+	frame->toViewport(shader);
 }
 
 
