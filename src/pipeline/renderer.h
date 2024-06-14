@@ -167,6 +167,8 @@ namespace SCN {
 		void renderSceneForward(SCN::Scene* scene, Camera* camera);
 		void renderSceneDeferred(SCN::Scene* scene, Camera* camera);
 
+		void renderPostFx(GFX::Texture* final_frame);
+
 		//render the skybox
 		void renderSkybox(GFX::Texture* cubemap);
 	

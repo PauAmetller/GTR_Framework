@@ -45,6 +45,9 @@ GFX::FBO* planar_reflection_fbo = nullptr;
 
 GFX::Texture* cloned_depth_texture = nullptr;
 
+//For motion blurr
+mat4 viewprojection_previous_frame;
+
 //a place to store info about the layout of the grid
 sIrradianceInfo probes_info;
 
@@ -329,11 +332,36 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 
 	capturePlanarReflection(camera);
 
-	if (pipeline_mode == ePipelineMode::FORWARD)
-		renderSceneForward(scene, camera);
+	vec2 size = CORE::getWindowSize();
+
+	//Postprocessing
+	if (!final_fbo || (final_fbo->width != size.x || final_fbo->height != size.y))
+	{
+		final_fbo = new GFX::FBO();
+		final_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
+	}
+
+	if (!postFxA_fbo || (postFxA_fbo->width != size.x || postFxA_fbo->height != size.y))
+	{
+		postFxA_fbo = new GFX::FBO();
+		postFxA_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
+	}
+
+	if (!postFxB_fbo || (postFxB_fbo->width != size.x || postFxB_fbo->height != size.y))
+	{
+		postFxB_fbo = new GFX::FBO();
+		postFxB_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
+	}
+
+	if (pipeline_mode == ePipelineMode::FORWARD) {
+		final_fbo->bind();
+			renderSceneForward(scene, camera);
+		final_fbo->unbind();
+	}
 	else if (pipeline_mode == ePipelineMode::DEFERRED)
 		renderSceneDeferred(scene, camera);
 
+	renderPostFx(final_fbo->color_textures[0]);
 
 	opaqueRenderables.clear();
 	alphaRenderables.clear();
@@ -429,25 +457,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	{
 		volumetric_fbo = new GFX::FBO();
 		volumetric_fbo->create(size.x / 2, size.y / 2, 1, GL_RGBA, GL_UNSIGNED_BYTE, false);
-	}
-
-	//Postprocessing
-	if (!final_fbo || (final_fbo->width != size.x || final_fbo->height != size.y))
-	{
-		final_fbo = new GFX::FBO();
-		final_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
-	}
-
-	if (!postFxA_fbo || (postFxA_fbo->width != size.x || postFxA_fbo->height != size.y))
-	{
-		postFxA_fbo = new GFX::FBO();
-		postFxA_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
-	}
-
-	if (!postFxB_fbo || (postFxB_fbo->width != size.x || postFxB_fbo->height != size.y))
-	{
-		postFxB_fbo = new GFX::FBO();
-		postFxB_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
 	}
 
 	gbuffers->bind();
@@ -895,23 +904,29 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 			ssao_blurr->color_textures[0]->toViewport();
 
 	final_fbo->unbind();
+}
+
+void Renderer::renderPostFx(GFX::Texture* final_frame) 
+{
+
+	vec2 size = CORE::getWindowSize();
 
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 
 	postFxA_fbo->bind();
 
-	if(!deactivate_tonemapper){
+	if (!deactivate_tonemapper) {
 		GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
 		shader->enable();
 		shader->setUniform("u_scale", scale);
 		shader->setUniform("u_average_lum", average_lum);
 		shader->setUniform("u_lumwhite2", lumwhite2);
 		shader->setUniform("u_igamma", float(1.0 / igamma));
-		final_fbo->color_textures[0]->toViewport(shader);
+		final_frame->toViewport(shader);
 	}
 	else {
-		final_fbo->color_textures[0]->toViewport();
+		final_frame->toViewport();
 	}
 
 	postFxA_fbo->unbind();
@@ -923,7 +938,6 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	postFxB_fbo->unbind();
 
 	postFxB_fbo->color_textures[0]->toViewport();
-
 }
 
 
