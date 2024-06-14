@@ -31,7 +31,6 @@ GFX::FBO* ssao_blurr = nullptr;
 GFX::FBO* irr_fbo = nullptr;
 GFX::FBO* reflection_fbo = nullptr;
 GFX::FBO* volumetric_fbo = nullptr;
-GFX::FBO* decals_fbo = nullptr;
 
 std::vector<vec3> random_points;
 std::vector<float> weights;
