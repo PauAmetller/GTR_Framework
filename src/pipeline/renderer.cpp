@@ -31,6 +31,7 @@ GFX::FBO* ssao_blurr = nullptr;
 GFX::FBO* irr_fbo = nullptr;
 GFX::FBO* reflection_fbo = nullptr;
 GFX::FBO* volumetric_fbo = nullptr;
+GFX::FBO* final_fbo = nullptr;
 
 std::vector<vec3> random_points;
 std::vector<float> weights;
@@ -394,9 +395,11 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		gbuffers = new GFX::FBO();
 		gbuffers->create(size.x, size.y, 4, GL_RGBA, GL_UNSIGNED_BYTE, true);
 
+		//For the decals
 		cloned_depth_texture = new GFX::Texture(size.x, size.y, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT);
 	}
 
+	//illumination
 	if (!illumination || (illumination->width != size.x || illumination->height != size.y)) {
 		illumination = new GFX::FBO();
 		illumination->create(size.x, size.y, 1, GL_RGBA, GL_FLOAT, true);
@@ -424,6 +427,13 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	{
 		volumetric_fbo = new GFX::FBO();
 		volumetric_fbo->create(size.x/2, size.y/2, 1, GL_RGBA, GL_UNSIGNED_BYTE, false);
+	}
+
+	//Postprocessing
+	if (!final_fbo || (final_fbo->width != size.x || final_fbo->height != size.y)) 
+	{
+		final_fbo = new GFX::FBO();
+		final_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
 	}
 
 	gbuffers->bind();
@@ -553,6 +563,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_BLEND);
+
+	//final_fbo->bind();
 
 	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -794,6 +806,9 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	illumination->unbind();
 
+	//final_fbo->unbind();
+
+	//final_fbo->color_textures[0]->toViewport();
 
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
@@ -1642,8 +1657,15 @@ void Renderer::showUI()
 		ImGui::Checkbox("Add volumetric Fog", &volumetric_light);
 		ImGui::DragFloat("Air density", &air_density, 0.00001f, 0.0f, 1.0f, "%.5f");
 		ImGui::DragFloat("Ambient Light Weight", &weight_ambient_light, 0.1f, 0.5f, 10.0f);
+		ImGui::TreePop();
 	}
-	ImGui::Checkbox("Decals", &decal);
+	if (ImGui::TreeNode("Decals OPTIONS")) {
+		ImGui::Checkbox("Decals", &decal);
+		ImGui::TreePop();
+	}
+	if (ImGui::TreeNode("Postprocessing OPTIONS")) {
+	    ImGui::TreePop();
+	}
 }
 
 #else
