@@ -115,6 +115,7 @@ namespace SCN {
 
 		//Volumetric
 		float air_density;
+		float weight_ambient_light;
 
 		//SSAO blur
 		int kernel_size;

@@ -105,6 +105,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 
 	//Volumetric
 	air_density = 0.004;
+	weight_ambient_light = 1.0;
 
 	//Tonemapper
 	scale = 1.0;
@@ -510,7 +511,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	if (texture_ssao == NULL)
 		texture_ssao = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
 
-	if (lights.size() && (!skip_lights)) {
+	if (illumination) {
 
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_ALWAYS);
@@ -532,7 +533,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		shader->setUniform("u_linear_factor", ssao_linear);
 		shader->setUniform("u_linear_space", Linear_space ? 1 : 0);
 
-		if (directional_lights.size()) {
+		if (directional_lights.size() && (!skip_lights)) {
 
 			for (LightEntity* light : directional_lights) {
 				lightToShader(light, shader);
@@ -547,9 +548,8 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		else {
 			quad->render(GL_TRIANGLES);
 		}
-		shader->disable();
 		
-		if (point_and_spot_lights.size()) {
+		if (point_and_spot_lights.size() && (!skip_lights)) {
 
 			shader = GFX::Shader::Get("deferred_ws");
 
@@ -661,7 +661,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		glDisable(GL_DEPTH_TEST);
 		glDepthFunc(GL_ALWAYS);
 
-		GFX::Shader* volumetric_shader = GFX::Shader::Get("volumetric");
+		GFX::Shader* volumetric_shader = GFX::Shader::Get("volumetric_lights");
 		assert(volumetric_shader);
 		volumetric_shader->enable();
 		cameraToShader(camera, volumetric_shader);
@@ -671,21 +671,28 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		volumetric_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 		volumetric_shader->setUniform("u_ambient_light", deactivate_ambient_light ? vec3(0.0) : scene->ambient_light);
 		volumetric_shader->setUniform("u_air_density", air_density);
+		volumetric_shader->setUniform("u_weight_ambient_light", weight_ambient_light);
 		volumetric_shader->setUniform("u_time", (float)getTime() * 0.001f);
-		lightToShader(moon_light, volumetric_shader);
-		quad->render(GL_TRIANGLES);
 
-		/*for (LightEntity* light : lights) {
+		if (lights.size() && (!skip_lights)) {
+			for (LightEntity* light : lights) {
 
-			lightToShader(light, volumetric_shader);
+				lightToShader(light, volumetric_shader);
+				quad->render(GL_TRIANGLES);
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			}
+		}
+		else {
+			volumetric_shader->setUniform("u_light_type", 0);
 			quad->render(GL_TRIANGLES);
-			volumetric_shader->setUniform("u_ambient_light", vec3(0.0));
-		}*/
+		}
 
 		volumetric_shader->disable();
 		volumetric_fbo->unbind();
 
 		glDisable(GL_BLEND);
+
 	}
 
 	glDepthFunc(GL_LESS);
@@ -1205,7 +1212,6 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 	glDepthFunc(GL_LEQUAL);
 
 	//multi_pass
-	int shadow_map_index = 0;
 	if (lights.size()) {
 		for (LightEntity* light : lights) {
 			lightToShader(light, shader);
@@ -1571,8 +1577,11 @@ void Renderer::showUI()
 		ImGui::Checkbox("Render Reflection Probes", &reflection_probes_grid);
 		ImGui::TreePop();
 	}
-	ImGui::Checkbox("Add volumetric light", &volumetric_light);
-	ImGui::DragFloat("Air density", &air_density, 0.00001f, 0.0f, 1.0f, "%.5f");
+	if (ImGui::TreeNode("Volumetric Fog OPTIONS")) {
+		ImGui::Checkbox("Add volumetric Fog", &volumetric_light);
+		ImGui::DragFloat("Air density", &air_density, 0.00001f, 0.0f, 1.0f, "%.5f");
+		ImGui::DragFloat("Ambient Light Weight", &weight_ambient_light, 0.1f, 0.5f, 10.0f);
+	}
 }
 
 #else

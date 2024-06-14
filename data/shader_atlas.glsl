@@ -1051,29 +1051,7 @@ void main()
     	FragColor = vec4(result / total_weight, 1.0);
 }
 
-\volumetric.fs
-
-#version 330 core
-
-in vec3 v_position;
-in vec2 v_uv;
-
-uniform sampler2D u_depth_texture;
-uniform sampler2D u_normal_texture;
-uniform vec3 u_camera_position;
-uniform mat4 u_inverse_viewprojection;
-uniform mat4 u_viewprojection;
-uniform vec2 u_iRes;
-
-uniform vec3 u_light_color;
-uniform vec3 u_light_position;
-
-uniform vec3 u_ambient_light;
-uniform float u_air_density;
-uniform float u_time;
-
-#include "ComputeShadow"
-
+\Noise
 
 float rand(vec2 n) { 
 	return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
@@ -1115,6 +1093,31 @@ float noise(vec3 p){
 
     return o4.y * d.y + o4.x * (1.0 - d.y);
 }
+
+\volumetric.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_normal_texture;
+uniform vec3 u_camera_position;
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+
+uniform vec3 u_light_color;
+uniform vec3 u_light_position;
+
+uniform vec3 u_ambient_light;
+uniform float u_air_density;
+uniform float u_time;
+
+#include "ComputeShadow"
+
+#include "Noise"
 
 layout(location = 0) out vec4 FragColor;
 
@@ -1184,6 +1187,7 @@ uniform float u_light_max_distance;
 uniform vec2 u_light_cone_info;
 
 uniform vec3 u_ambient_light;
+uniform float u_weight_ambient_light;
 uniform float u_air_density;
 uniform float u_time;
 
@@ -1193,47 +1197,7 @@ uniform float u_time;
 
 #include "ComputeShadow"
 
-
-float rand(vec2 n) { 
-	return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
-}
-
-float noise(vec2 p){
-	vec2 ip = floor(p);
-	vec2 u = fract(p);
-	u = u*u*(3.0-2.0*u);
-	
-	float res = mix(
-		mix(rand(ip),rand(ip+vec2(1.0,0.0)),u.x),
-		mix(rand(ip+vec2(0.0,1.0)),rand(ip+vec2(1.0,1.0)),u.x),u.y);
-	return res*res;
-}
-
-float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
-vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
-vec4 perm(vec4 x){return mod289(((x * 34.0) + 1.0) * x);}
-
-float noise(vec3 p){
-    vec3 a = floor(p);
-    vec3 d = p - a;
-    d = d * d * (3.0 - 2.0 * d);
-
-    vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
-    vec4 k1 = perm(b.xyxy);
-    vec4 k2 = perm(k1.xyxy + b.zzww);
-
-    vec4 c = k2 + a.zzzz;
-    vec4 k3 = perm(c);
-    vec4 k4 = perm(c + 1.0);
-
-    vec4 o1 = fract(k3 * (1.0 / 41.0));
-    vec4 o2 = fract(k4 * (1.0 / 41.0));
-
-    vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
-    vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
-
-    return o4.y * d.y + o4.x * (1.0 - d.y);
-}
+#include "Noise"
 
 layout(location = 0) out vec4 FragColor;
 
@@ -1269,14 +1233,16 @@ void main()
 
 	for(int i = 0; i < MAX_ITERATIONS; ++i)
 	{
-		float particle_density = max(0.0, noise(current_pos * vec3(0.1,0.3,0.1) + vec3(u_time, 0.0, u_time)) - max(0.0, current_pos.y) * 0.002);		
+		float height_factor = max(0.0, current_pos.y) * 0.002;
+		float particle_density = max(0.0, noise(current_pos * vec3(0.1,0.3,0.1) + vec3(u_time, 0.0, u_time)) - height_factor);		
 		float shadow_factor = 1.0;
+		vec3 add_light = vec3(0.0);
 		if (u_light_cast_shadow == 0)
 			shadow_factor = computeShadow(current_pos);
 		
 		if (u_light_type == DIRECTIONALLIGHT)
 		{
-			light += u_light_color;		
+			add_light = u_light_color;		
 		}
 		else if (u_light_type == POINTLIGHT || u_light_type == SPOTLIGHT)
 		{
@@ -1300,15 +1266,20 @@ void main()
 					att_factor *= (cos_angle - min_angle_cos) / (max_angle_cos - min_angle_cos);
 				}
 			}
+			add_light = u_light_color * att_factor;
 		}
-
-		light *= shadow_factor * step_dist * particle_density;;
+		
+		add_light *= shadow_factor;
+		light += step_dist * particle_density * ((1.0 / float(MAX_ITERATIONS)) / u_weight_ambient_light) * add_light;
+		translucency -= u_air_density * step_dist * particle_density;
 
 		current_pos += ray_step;
-		translucency -= u_air_density * step_dist * particle_density;
+
 		if( translucency <= 0.0 )
 			break;
 	}
+	if(light == vec3(0.0))
+		discard;
 
 	FragColor = vec4(light, clamp(1.0 - translucency, 0.0, 1.0)); 
 }
