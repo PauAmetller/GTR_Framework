@@ -105,6 +105,7 @@ namespace SCN {
 		bool reflection_probes_grid;
 		bool volumetric_light;
 		bool decal;
+		bool deactivate_motion_blur;
 
 		float ssao_max_distance;
 
@@ -170,7 +171,9 @@ namespace SCN {
 		void renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffer);
 
 		//PostProssesing shaders
-		void applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera);
+		int applyPostProcessing(std::string shader_name, GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera);
+		int applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera);
+		int applyToneMapper(GFX::Texture* frame);
 
 		//render the skybox
 		void renderSkybox(GFX::Texture* cubemap);

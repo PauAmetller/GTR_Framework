@@ -82,6 +82,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	reflection_probes_grid = false;
 	volumetric_light = false;
 	decal = false;
+	deactivate_motion_blur = false;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -919,8 +920,67 @@ void Renderer::renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffe
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 
-	postFxA_fbo->bind();
+	//Define global at the end
+	std::vector<std::string> PostProcessing_list = { "motion_blurr", "tone_mapper" };
+	int number_of_postProcessing = PostProcessing_list.size();
 
+	int use_fbo = -1;
+	int not_apply_count = 0;
+	GFX::Texture* frame = final_frame;
+
+	for (int i = 0; i < number_of_postProcessing; i++) {
+		use_fbo = (use_fbo + 1) % 2;
+		if (use_fbo == 0) {
+			postFxA_fbo->bind();
+			use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+			postFxA_fbo->unbind();
+			frame = postFxA_fbo->color_textures[0];
+		}
+		else if (use_fbo == 1) {
+			postFxB_fbo->bind();
+			use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+			postFxB_fbo->unbind();
+			frame = postFxB_fbo->color_textures[0];
+		}
+	}
+
+	frame->toViewport();
+}
+
+
+//Post Processing shaders
+int Renderer::applyPostProcessing(std::string shader_name, GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera) {
+	if (shader_name == "motion_blurr") {
+		return applyMotionBlurr(frame, depth_buffer, iRes, camera);
+	}
+	else if (shader_name == "tone_mapper") 
+	{
+		return applyToneMapper(frame);
+	} //... Put all other postprocessing
+	else {
+		return 0;
+	}
+}
+
+
+int Renderer::applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera) {
+	if (!deactivate_motion_blur) {
+		GFX::Shader* shader = GFX::Shader::Get("motion_blurr");
+		shader->enable();
+		shader->setUniform("u_iRes", iRes);
+		shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+		shader->setUniform("u_viewprojection_prev", viewprojection_previous_frame);
+		shader->setUniform("u_depth_texture", depth_buffer, 1);
+		viewprojection_previous_frame = camera->viewprojection_matrix;
+		frame->toViewport(shader);
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
+int Renderer::applyToneMapper(GFX::Texture* frame) {
 	if (!deactivate_tonemapper) {
 		GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
 		shader->enable();
@@ -928,34 +988,12 @@ void Renderer::renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffe
 		shader->setUniform("u_average_lum", average_lum);
 		shader->setUniform("u_lumwhite2", lumwhite2);
 		shader->setUniform("u_igamma", float(1.0 / igamma));
-		final_frame->toViewport(shader);
+		frame->toViewport(shader);
+		return 0;
 	}
 	else {
-		final_frame->toViewport();
+		return 1;
 	}
-
-	postFxA_fbo->unbind();
-
-	postFxB_fbo->bind();
-
-	applyMotionBlurr(postFxA_fbo->color_textures[0], depth_buffer, iRes, camera);
-
-	postFxB_fbo->unbind();
-
-	postFxB_fbo->color_textures[0]->toViewport();
-}
-
-
-//Post Processing shaders
-void Renderer::applyMotionBlurr(GFX::Texture* frame, GFX::Texture* depth_buffer, vec2 iRes, Camera* camera) {
-	GFX::Shader* shader = GFX::Shader::Get("motion_blurr");
-	shader->enable();
-	shader->setUniform("u_iRes", iRes);
-	shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	shader->setUniform("u_viewprojection_prev", viewprojection_previous_frame);
-	shader->setUniform("u_depth_texture", depth_buffer, 1);
-	viewprojection_previous_frame = camera->viewprojection_matrix;
-	frame->toViewport(shader);
 }
 
 
@@ -1726,6 +1764,7 @@ void Renderer::showUI()
 		ImGui::TreePop();
 	}
 	if (ImGui::TreeNode("Postprocessing OPTIONS")) {
+		ImGui::Checkbox("Deactivate Motion Blur", &deactivate_motion_blur);
 	    ImGui::TreePop();
 	}
 }
