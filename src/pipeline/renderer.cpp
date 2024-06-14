@@ -32,6 +32,8 @@ GFX::FBO* irr_fbo = nullptr;
 GFX::FBO* reflection_fbo = nullptr;
 GFX::FBO* volumetric_fbo = nullptr;
 GFX::FBO* final_fbo = nullptr;
+GFX::FBO* postFxA_fbo = nullptr;
+GFX::FBO* postFxB_fbo = nullptr;
 
 std::vector<vec3> random_points;
 std::vector<float> weights;
@@ -434,6 +436,18 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	{
 		final_fbo = new GFX::FBO();
 		final_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
+	}
+
+	if (!postFxA_fbo || (postFxA_fbo->width != size.x || postFxA_fbo->height != size.y))
+	{
+		postFxA_fbo = new GFX::FBO();
+		postFxA_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
+	}
+
+	if (!postFxB_fbo || (postFxB_fbo->width != size.x || postFxB_fbo->height != size.y))
+	{
+		postFxB_fbo = new GFX::FBO();
+		postFxB_fbo->create(size.x, size.y, 1, GL_RGB, GL_HALF_FLOAT);
 	}
 
 	gbuffers->bind();
@@ -882,6 +896,11 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	final_fbo->unbind();
 
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+
+	postFxA_fbo->bind();
+
 	if(!deactivate_tonemapper){
 		GFX::Shader* shader = GFX::Shader::Get("tone_mapper");
 		shader->enable();
@@ -894,6 +913,16 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	else {
 		final_fbo->color_textures[0]->toViewport();
 	}
+
+	postFxA_fbo->unbind();
+
+	postFxB_fbo->bind();
+
+	postFxA_fbo->color_textures[0]->toViewport();
+
+	postFxB_fbo->unbind();
+
+	postFxB_fbo->color_textures[0]->toViewport();
 
 }
 
