@@ -35,10 +35,10 @@ Application::Application()
 	scene = new SCN::Scene();
 	/*if (!scene->load("data/scene_benchmark.json"))
 		exit(1);*/
-	if (!scene->load("data/scene_irradiance.json"))
-		exit(1);
-	/*if (!scene->load("data/scene.json"))
-			exit(1);*/
+	/*if (!scene->load("data/scene_irradiance.json"))
+		exit(1);*/
+	if (!scene->load("data/scene.json"))
+			exit(1);
 
 	//camera->lookAt(scene->main_camera.eye, scene->main_camera.center, vec3(0, 1, 0));
 	camera->fov = scene->main_camera.fov;

@@ -116,6 +116,7 @@ namespace SCN {
 
 		float ssao_max_distance;
 		float irradiance_factor;
+		float reflection_factor;
 
 		int shadow_map_index;
 		int shadow_map_size;
@@ -164,6 +165,7 @@ namespace SCN {
 		std::vector<sProbe> probes;
 
 		GFX::Texture* probes_texture = nullptr;
+		GFX::Texture* probes_texture_reflection = nullptr;
 		GFX::FBO* planar_reflection_fbo = nullptr;
 
 		//SSAO

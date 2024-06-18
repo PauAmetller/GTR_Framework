@@ -38,14 +38,10 @@ GFX::FBO* postFxB_fbo = nullptr;
 std::vector<vec3> random_points;
 std::vector<float> weights;
 
-
-
 GFX::Texture* cloned_depth_texture = nullptr;
 
 //For motion blurr
 mat4 viewprojection_previous_frame;
-
-
 
 GFX::Mesh plane;
 
@@ -94,6 +90,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	apply_reflection = false;
 
 	irradiance_factor = 1.0;
+	reflection_factor = 1.0;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -147,7 +144,7 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	end_reflect = vec3(80, 80, 90);
 	dim_reflect = vec3(10, 4, 10);
 	initProbesReflection(start_reflect, end_reflect, dim_reflect);
-	//plane.createPlane(1);
+	plane.createPlane(1);
 }
 
 
@@ -341,9 +338,9 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	}
 
 	if (pipeline_mode == ePipelineMode::FORWARD) {
-		//final_fbo->bind();
+		final_fbo->bind();
 			renderSceneForward(scene, camera);
-		//final_fbo->unbind();
+		final_fbo->unbind();
 		renderPostFx(final_fbo->color_textures[0], final_fbo->depth_texture);
 	}
 	else if (pipeline_mode == ePipelineMode::DEFERRED) {
@@ -592,7 +589,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 	if (texture_ssao == NULL)
 		texture_ssao = GFX::Texture::getWhiteTexture(); //a 1x1 white texture
-
+	
 	if (illumination) {
 
 		glEnable(GL_DEPTH_TEST);
@@ -770,42 +767,88 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->disable();
 	}
 
-	//if (apply_reflection)
-	//{
-	//	GFX::Shader* ref_shader = GFX::Shader::Get("reflection");
-	//	assert(ref_shader);
-	//	ref_shader->enable();
+	if (reflection_fbo != NULL && apply_reflection)
+	{
+		GFX::Shader* ref_shader = GFX::Shader::Get("reflection");
+		assert(ref_shader);
+		ref_shader->enable();
 
-	//	glDisable(GL_DEPTH_TEST);
-	//	glEnable(GL_BLEND); //disabled just to see irradiance
-	//	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND); //disabled just to see reflection
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-	//	reflection_probes_info.num_probes = reflection_probes.size();
+		reflection_probes_info.num_probes = reflection_probes.size();
 
-	//	// we send every data necessary
-	//	ref_shader->setUniform("u_irr_start", reflection_probes_info.start);
-	//	ref_shader->setUniform("u_irr_end", reflection_probes_info.end);
-	//	ref_shader->setUniform("u_irr_dims", reflection_probes_info.dim);
-	//	ref_shader->setUniform("u_irr_delta", reflection_probes_info.delta);
-	//	ref_shader->setUniform("u_num_probes", (int)reflection_probes_info.num_probes);
-	//	//ref_shader->setUniform("u_probes_texture", reflection_probes., 4);
+		// we send every data necessary
+		ref_shader->setUniform("u_refl_start", reflection_probes_info.start);
+		ref_shader->setUniform("u_refl_end", reflection_probes_info.end);
+		ref_shader->setUniform("u_refl_dims", reflection_probes_info.dim);
+		ref_shader->setUniform("u_refl_delta", reflection_probes_info.delta);
+		ref_shader->setUniform("u_num_refl_probes", (int)reflection_probes_info.num_probes);
+		ref_shader->setUniform("u_probes_texture", reflection_fbo->color_textures[0], 4);
 
-	//	ref_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
-	//	ref_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
-	//	ref_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
-	//	ref_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+		ref_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+		ref_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+		ref_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+		ref_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
 
-	//	ref_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-	//	ref_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
-	//	ref_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	//	ref_shader->setUniform("u_factor", irradiance_factor);
+		ref_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+		ref_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+		ref_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+		ref_shader->setUniform("u_refl_factor", reflection_factor);
 
-	//	quad->render(GL_TRIANGLES);
+		quad->render(GL_TRIANGLES);
 
-	//	ref_shader->disable();
-	//}
+		ref_shader->disable();
+	}
 
-	/*if (volumetric_fbo) {
+	//
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_DEPTH_TEST);
+
+	if (planar_reflection_fbo && show_gbuffer != eShowGBuffer::DEPTH && show_gbuffer != eShowGBuffer::GBUFFERS)
+	{
+		GFX::Shader* planar_shader = GFX::Shader::getDefaultShader("planar");
+		planar_shader->enable();
+		mat4 model;
+		model.scale(1000, 1000, 1000);
+		planar_shader->setUniform("u_model", model);
+		planar_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+		cameraToShader(camera, planar_shader);
+		planar_shader->setTexture("u_texture", planar_reflection_fbo->color_textures[0], 0);
+		plane.render(GL_TRIANGLES);
+		planar_shader->disable();
+	}
+
+	if (enableIrradianceCapture) {
+		captureProbes();
+		enableIrradianceCapture = false;
+	}
+	if (probes_grid) {
+		renderProbes(probe_size);
+	}
+	else {
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
+
+	if (enableReflectionCapture) {
+		captureReflectionProbes();
+		enableReflectionCapture = false;
+	}
+	if (reflection_probes_grid) {
+		renderReflectionProbes(probe_size_reflect);
+	}
+	else {
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
+	illumination->unbind();
+
+	if (volumetric_fbo) {
 
 		volumetric_fbo->bind();
 
@@ -845,55 +888,10 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		glDisable(GL_BLEND);
 
-	}*/
-
-	glDepthFunc(GL_LESS);
-	glEnable(GL_DEPTH_TEST);
-
-	if (planar_reflection_fbo && show_gbuffer != eShowGBuffer::DEPTH && show_gbuffer != eShowGBuffer::GBUFFERS)
-	{
-		GFX::Shader* planar_shader = GFX::Shader::getDefaultShader("planar");
-		planar_shader->enable();
-		mat4 model;
-		model.scale(1000, 1000, 1000);
-		planar_shader->setUniform("u_model", model);
-		planar_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
-		cameraToShader(camera, planar_shader);
-		planar_shader->setTexture("u_texture", planar_reflection_fbo->color_textures[0], 0);
-		plane.render(GL_TRIANGLES);
-		planar_shader->disable();
 	}
 
-	//renderProbe(probe.pos, 1, probe.sh);
-	if (enableIrradianceCapture) {
-		captureProbes();
-		enableIrradianceCapture = false;
-	}
-	if (probes_grid) {
-		renderProbes(probe_size);
-	}
-	else {
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_CULL_FACE);
-	}
 
-	if (enableReflectionCapture) {
-		captureReflectionProbes();
-		enableReflectionCapture = false;
-	}
-	if (reflection_probes_grid) {
-		renderReflectionProbes(probe_size_reflect);
-	}
-	else {
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glEnable(GL_CULL_FACE);
-	}
-	illumination->unbind();
-
-
-	//final_fbo->bind();
+	final_fbo->bind();
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
 		illumination->color_textures[0]->toViewport();
@@ -969,7 +967,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		else
 			ssao_blurr->color_textures[0]->toViewport();
 
-	//final_fbo->unbind();
+	final_fbo->unbind();
 }
 
 
@@ -977,38 +975,42 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 void Renderer::renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffer)
 {
 
-	//vec2 size = CORE::getWindowSize();
-	//Camera* camera = Camera::current;
-	//vec2 iRes = vec2(1.0 / (float)size.x, 1.0 / (float)size.y);
+	vec2 size = CORE::getWindowSize();
+	Camera* camera = Camera::current;
+	vec2 iRes = vec2(1.0 / (float)size.x, 1.0 / (float)size.y);
 
-	//glDisable(GL_BLEND);
-	//glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
 
-	////Define global at the end
-	//std::vector<std::string> PostProcessing_list = { "motion_blurr", "tone_mapper" };
-	//int number_of_postProcessing = PostProcessing_list.size();
+	//Define global at the end
+	std::vector<std::string> PostProcessing_list = { "motion_blurr", "tone_mapper" };
+	int number_of_postProcessing = PostProcessing_list.size();
 
-	//int use_fbo = -1;
-	//int not_apply_count = 0;
-	//GFX::Texture* frame = final_frame;
+	int use_fbo = -1;
+	int not_apply_count = 0;
+	GFX::Texture* frame = final_frame;
 
-	//for (int i = 0; i < number_of_postProcessing; i++) {
-	//	use_fbo = (use_fbo + 1) % 2;
-	//	if (use_fbo == 0) {
-	//		postFxA_fbo->bind();
-	//		use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
-	//		postFxA_fbo->unbind();
-	//		frame = postFxA_fbo->color_textures[0];
-	//	}
-	//	else if (use_fbo == 1) {
-	//		postFxB_fbo->bind();
-	//		use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
-	//		postFxB_fbo->unbind();
-	//		frame = postFxB_fbo->color_textures[0];
-	//	}
-	//}
+	for (int i = 0; i < number_of_postProcessing; i++) {
+		use_fbo = (use_fbo + 1) % 2;
+		if (use_fbo == 0) {
+			postFxA_fbo->bind();
+			int result = applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+			postFxA_fbo->unbind();
+			if (result != 1) {
+				frame = postFxA_fbo->color_textures[0];
+			}
+		}
+		else if (use_fbo == 1) {
+			postFxB_fbo->bind();
+			int result = applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+			postFxB_fbo->unbind();
+			if (result != 1) {
+				frame = postFxB_fbo->color_textures[0];
+			}
+		}
+	}
 
-	//frame->toViewport();
+	frame->toViewport();
 }
 
 
@@ -1919,7 +1921,7 @@ void Renderer::showUI()
 		if (valuesChanged2) {
 			initProbesReflection(start_reflect, end_reflect, dim_reflect);
 		}
-		//ImGui::DragFloat("Factor", &irradiance_factor, 0.01f, 0.001, 1.5, "%.3f");
+		ImGui::DragFloat("Factor", &reflection_factor, 0.001f, 0.001, 2, "%.3f");
 		ImGui::SliderInt("Probe \nSize", &probe_size_reflect, 1, 7);
 		ImGui::Checkbox("Capture Reflections", &enableReflectionCapture);
 		ImGui::Checkbox("Apply Reflection", &apply_reflection);

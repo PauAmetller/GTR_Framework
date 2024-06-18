@@ -14,6 +14,7 @@ tone_mapper quad.vs tonemapper.fs
 probe basic.vs probe.fs
 reflectionProbe basic.vs reflectionProbe.fs
 irradiance quad.vs irradiance.fs
+reflection quad.vs reflection.fs
 irradiance_interpol quad.vs irradiance_interpol.fs
 planar basic.vs planar.fs
 //fog only moon_light
@@ -804,10 +805,81 @@ void main()
 	//now we can use the coefficients to compute the irradiance
 	vec3 irradiance = ComputeSHIrradiance( N, sh );
 
-
     irradiance *= u_factor;
 
 	FragColor = vec4(max(irradiance, vec3(0.0)), 1.0);
+
+}
+
+\reflection.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_color_texture;
+uniform sampler2D u_normal_texture;
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_extra_texture;
+uniform samplerCube u_probes_texture;
+
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+
+uniform vec3 u_refl_start;
+uniform vec3 u_refl_end;
+uniform vec3 u_refl_dims;
+uniform float u_refl_normal_distance;
+uniform float u_refl_delta;
+uniform int u_num_refl_probes;
+uniform float u_refl_factor;
+out vec4 FragColor;
+
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
+	vec4 color = texture( u_color_texture, uv);
+	vec3 N = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	float depth = texture( u_depth_texture, uv).x;
+
+
+	if(depth == 1.0)
+		discard;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);	
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
+	N = normalize(N);	
+
+	//computing nearest probe index based on world position
+	vec3 refl_range = u_refl_end - u_refl_start;
+	vec3 refl_local_pos = clamp( worldpos - u_refl_start + N * u_refl_normal_distance, vec3(0.0), refl_range );
+
+	//convert from world pos to grid pos
+	vec3 refl_norm_pos = refl_local_pos / u_refl_delta;
+
+	//round values as we cannot fetch between rows for now
+	vec3 local_indices = round( refl_norm_pos );
+
+	//compute in which row is the probe stored
+	float row = local_indices.x + 
+	local_indices.y * u_refl_dims.x + 
+	local_indices.z * u_refl_dims.x * u_refl_dims.y;
+
+	//find the UV.y coord of that row in the probes texture
+	float row_uv = (row + 1.0) / (u_num_refl_probes + 1.0);
+
+	float metalness = color.a;
+	float roughness = texture(u_normal_texture, uv).a;
+	
+	vec3 reflection = texture(u_probes_texture, normalize(vec3(worldpos - u_refl_start))).xyz;
+    reflection *= metalness;
+    reflection *= u_refl_factor;
+
+	FragColor = vec4(max(reflection, vec3(0.0)), 1.0);
 
 }
 
@@ -911,7 +983,6 @@ void main()
 	vec3 final_color;
 
 	final_color = ((NdotL * light_add) + light) * color.xyz + emissive * u_emissive_first;
-
 
 	if (u_linear_space == LINEAR_SPACE){
 		FragColor = vec4(gamma(final_color), 1.0);
@@ -1193,8 +1264,8 @@ void main()
 	for(int i = 0; i < 10; ++i)
 		color += texture(u_texture, mix(uv, prev.xy, i/9.0));
 	color /= 9.0;
-	//FragColor = color;
-	FragColor = vec4(1.0);
+	FragColor = color;
+	//FragColor = vec4(1.0);
 }
 
 
