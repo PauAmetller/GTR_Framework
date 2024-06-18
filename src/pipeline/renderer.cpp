@@ -38,22 +38,26 @@ GFX::FBO* postFxB_fbo = nullptr;
 std::vector<vec3> random_points;
 std::vector<float> weights;
 
-std::vector<sProbe> probes;
 
-GFX::Texture* probes_texture = nullptr;
-GFX::FBO* planar_reflection_fbo = nullptr;
 
 GFX::Texture* cloned_depth_texture = nullptr;
 
 //For motion blurr
 mat4 viewprojection_previous_frame;
 
-//a place to store info about the layout of the grid
-sIrradianceInfo probes_info;
 
-std::vector<sReflectionProbe*> reflection_probes;
 
 GFX::Mesh plane;
+
+vec3 start;
+vec3 end;
+vec3 dim;
+int probe_size;
+
+vec3 start_reflect;
+vec3 end_reflect;
+vec3 dim_reflect;
+int probe_size_reflect;
 
 Renderer::Renderer(const char* shader_atlas_filename)
 {
@@ -83,6 +87,13 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	volumetric_light = false;
 	decal = false;
 	deactivate_motion_blur = false;
+	enableReflectionCapture = false;
+	enableIrradianceCapture = false;
+	apply_irradiance = true;
+	interpolate = false;
+	apply_reflection = false;
+
+	irradiance_factor = 1.0;
 
 	pipeline_mode = ePipelineMode::DEFERRED;
 	show_gbuffer = eShowGBuffer::NONE;
@@ -123,45 +134,20 @@ Renderer::Renderer(const char* shader_atlas_filename)
 	lumwhite2 = 1.0;
 	igamma = 1.0;
 
-	//Probes
-	//define bounding of the grid and num probes
-	probes_info.start.set(-80, 0, -90);
-	probes_info.end.set(80, 80, 90);
-	probes_info.dim.set(10, 4, 10);
+	probe_size = 3;
 
-	//compute the vector from one corner to the other
-	vec3 delta = (probes_info.end - probes_info.start);
-	//compute delta from one probe to the next one
-	delta.x /= (probes_info.dim.x - 1);
-	delta.y /= (probes_info.dim.y - 1);
-	delta.z /= (probes_info.dim.z - 1);
-	probes_info.delta = delta; //store
+	start = vec3(-80, 0, -90);
+	end = vec3(80, 80, 90);
+	dim = vec3(10, 4, 10);
+	initProbes(start, end, dim);
 
-	probes.clear();
 
-	//lets compute the centers
-	//pay attention at the order at which we add them
-	for (int z = 0; z < probes_info.dim.z; ++z)
-		for (int y = 0; y < probes_info.dim.y; ++y)
-			for (int x = 0; x < probes_info.dim.x; ++x)
-			{
-				sProbe p;
-				p.local.set(x, y, z);
-
-				//index in the linear array
-				p.index = x + y * probes_info.dim.x + z *
-					probes_info.dim.x * probes_info.dim.y;
-
-				//and its position
-				p.pos = probes_info.start +
-					probes_info.delta * Vector3f(x, y, z);
-				probes.push_back(p);
-			}
-
-	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 0), nullptr }));
-	reflection_probes.push_back(new sReflectionProbe({ vec3(0, 100, 300), nullptr }));
-
-	plane.createPlane(1);
+	probe_size_reflect = 3;
+	start_reflect = vec3(-80, 0, -90);
+	end_reflect = vec3(80, 80, 90);
+	dim_reflect = vec3(10, 4, 10);
+	initProbesReflection(start_reflect, end_reflect, dim_reflect);
+	//plane.createPlane(1);
 }
 
 
@@ -355,9 +341,9 @@ void Renderer::renderScene(SCN::Scene* scene, Camera* camera)
 	}
 
 	if (pipeline_mode == ePipelineMode::FORWARD) {
-		final_fbo->bind();
+		//final_fbo->bind();
 			renderSceneForward(scene, camera);
-		final_fbo->unbind();
+		//final_fbo->unbind();
 		renderPostFx(final_fbo->color_textures[0], final_fbo->depth_texture);
 	}
 	else if (pipeline_mode == ePipelineMode::DEFERRED) {
@@ -712,9 +698,43 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}
 
 
-	if (probes_texture)
+	if (probes_texture && apply_irradiance && interpolate)
 	{
+		GFX::Shader* irr_inter_shader = GFX::Shader::Get("irradiance_interpol");
+		assert(irr_inter_shader);
+		irr_inter_shader->enable();
 
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND); //disabled just to see irradiance
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+		probes_info.num_probes = probes.size();
+
+		// we send every data necessary
+		irr_inter_shader->setUniform("u_irr_start", probes_info.start);
+		irr_inter_shader->setUniform("u_irr_end", probes_info.end);
+		irr_inter_shader->setUniform("u_irr_dims", probes_info.dim);
+		irr_inter_shader->setUniform("u_irr_delta", probes_info.delta);
+		irr_inter_shader->setUniform("u_num_probes", (int)probes_info.num_probes);
+		irr_inter_shader->setUniform("u_probes_texture", probes_texture, 4);
+
+		// you need also pass the distance factor, for now leave it as 0.0
+		irr_inter_shader->setUniform("u_irr_normal_distance", 0.0f);
+		irr_inter_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+		irr_inter_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+		irr_inter_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+		irr_inter_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+
+		irr_inter_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+		irr_inter_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+		irr_inter_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+		irr_inter_shader->setUniform("u_factor", irradiance_factor);
+
+		quad->render(GL_TRIANGLES);
+
+		irr_inter_shader->disable();
+	}else if (probes_texture && apply_irradiance && !interpolate)
+	{
 		GFX::Shader* irr_shader = GFX::Shader::Get("irradiance");
 		assert(irr_shader);
 		irr_shader->enable();
@@ -743,13 +763,49 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		irr_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
 		irr_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
 		irr_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+		irr_shader->setUniform("u_factor", irradiance_factor);
 
 		quad->render(GL_TRIANGLES);
 
 		irr_shader->disable();
 	}
 
-	if (volumetric_fbo) {
+	//if (apply_reflection)
+	//{
+	//	GFX::Shader* ref_shader = GFX::Shader::Get("reflection");
+	//	assert(ref_shader);
+	//	ref_shader->enable();
+
+	//	glDisable(GL_DEPTH_TEST);
+	//	glEnable(GL_BLEND); //disabled just to see irradiance
+	//	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+	//	reflection_probes_info.num_probes = reflection_probes.size();
+
+	//	// we send every data necessary
+	//	ref_shader->setUniform("u_irr_start", reflection_probes_info.start);
+	//	ref_shader->setUniform("u_irr_end", reflection_probes_info.end);
+	//	ref_shader->setUniform("u_irr_dims", reflection_probes_info.dim);
+	//	ref_shader->setUniform("u_irr_delta", reflection_probes_info.delta);
+	//	ref_shader->setUniform("u_num_probes", (int)reflection_probes_info.num_probes);
+	//	//ref_shader->setUniform("u_probes_texture", reflection_probes., 4);
+
+	//	ref_shader->setUniform("u_color_texture", gbuffers->color_textures[0], 0);
+	//	ref_shader->setUniform("u_normal_texture", gbuffers->color_textures[1], 1);
+	//	ref_shader->setUniform("u_extra_texture", gbuffers->color_textures[2], 2);
+	//	ref_shader->setUniform("u_depth_texture", gbuffers->depth_texture, 3);
+
+	//	ref_shader->setUniform("u_iRes", vec2(1.0 / size.x, 1.0 / size.y));
+	//	ref_shader->setUniform("u_inverse_viewprojection", camera->inverse_viewprojection_matrix);
+	//	ref_shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	//	ref_shader->setUniform("u_factor", irradiance_factor);
+
+	//	quad->render(GL_TRIANGLES);
+
+	//	ref_shader->disable();
+	//}
+
+	/*if (volumetric_fbo) {
 
 		volumetric_fbo->bind();
 
@@ -789,7 +845,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 
 		glDisable(GL_BLEND);
 
-	}
+	}*/
 
 	glDepthFunc(GL_LESS);
 	glEnable(GL_DEPTH_TEST);
@@ -809,27 +865,35 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 	}
 
 	//renderProbe(probe.pos, 1, probe.sh);
+	if (enableIrradianceCapture) {
+		captureProbes();
+		enableIrradianceCapture = false;
+	}
 	if (probes_grid) {
-		renderProbes(2);
+		renderProbes(probe_size);
 	}
-	//else {
-	//	glDisable(GL_BLEND);
-	//	glDisable(GL_DEPTH_TEST);
-	//	glEnable(GL_CULL_FACE);
-	//}
+	else {
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
 
+	if (enableReflectionCapture) {
+		captureReflectionProbes();
+		enableReflectionCapture = false;
+	}
 	if (reflection_probes_grid) {
-		renderReflectionProbes(10.0);
+		renderReflectionProbes(probe_size_reflect);
 	}
-	//else {
-	//	glDisable(GL_BLEND);
-	//	glDisable(GL_DEPTH_TEST);
-	//	glEnable(GL_CULL_FACE);
-	//}
-
+	else {
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+	}
 	illumination->unbind();
 
-	final_fbo->bind();
+
+	//final_fbo->bind();
 	if (show_gbuffer == eShowGBuffer::NONE)
 		//and render the texture into the screen
 		illumination->color_textures[0]->toViewport();
@@ -905,7 +969,7 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 		else
 			ssao_blurr->color_textures[0]->toViewport();
 
-	final_fbo->unbind();
+	//final_fbo->unbind();
 }
 
 
@@ -913,38 +977,38 @@ void Renderer::renderSceneDeferred(SCN::Scene* scene, Camera* camera) {
 void Renderer::renderPostFx(GFX::Texture* final_frame, GFX::Texture* depth_buffer)
 {
 
-	vec2 size = CORE::getWindowSize();
-	Camera* camera = Camera::current;
-	vec2 iRes = vec2(1.0 / (float)size.x, 1.0 / (float)size.y);
+	//vec2 size = CORE::getWindowSize();
+	//Camera* camera = Camera::current;
+	//vec2 iRes = vec2(1.0 / (float)size.x, 1.0 / (float)size.y);
 
-	glDisable(GL_BLEND);
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_BLEND);
+	//glDisable(GL_DEPTH_TEST);
 
-	//Define global at the end
-	std::vector<std::string> PostProcessing_list = { "motion_blurr", "tone_mapper" };
-	int number_of_postProcessing = PostProcessing_list.size();
+	////Define global at the end
+	//std::vector<std::string> PostProcessing_list = { "motion_blurr", "tone_mapper" };
+	//int number_of_postProcessing = PostProcessing_list.size();
 
-	int use_fbo = -1;
-	int not_apply_count = 0;
-	GFX::Texture* frame = final_frame;
+	//int use_fbo = -1;
+	//int not_apply_count = 0;
+	//GFX::Texture* frame = final_frame;
 
-	for (int i = 0; i < number_of_postProcessing; i++) {
-		use_fbo = (use_fbo + 1) % 2;
-		if (use_fbo == 0) {
-			postFxA_fbo->bind();
-			use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
-			postFxA_fbo->unbind();
-			frame = postFxA_fbo->color_textures[0];
-		}
-		else if (use_fbo == 1) {
-			postFxB_fbo->bind();
-			use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
-			postFxB_fbo->unbind();
-			frame = postFxB_fbo->color_textures[0];
-		}
-	}
+	//for (int i = 0; i < number_of_postProcessing; i++) {
+	//	use_fbo = (use_fbo + 1) % 2;
+	//	if (use_fbo == 0) {
+	//		postFxA_fbo->bind();
+	//		use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+	//		postFxA_fbo->unbind();
+	//		frame = postFxA_fbo->color_textures[0];
+	//	}
+	//	else if (use_fbo == 1) {
+	//		postFxB_fbo->bind();
+	//		use_fbo -= applyPostProcessing(PostProcessing_list[i], frame, depth_buffer, iRes, camera);
+	//		postFxB_fbo->unbind();
+	//		frame = postFxB_fbo->color_textures[0];
+	//	}
+	//}
 
-	frame->toViewport();
+	//frame->toViewport();
 }
 
 
@@ -1416,6 +1480,82 @@ void Renderer::renderMeshWithMaterialLights(const Matrix44 model, GFX::Mesh* mes
 /////////////
 
 
+void SCN::Renderer::initProbes(vec3 start, vec3 end, vec3 dim)
+{
+	//Probes
+	//define bounding of the grid and num probes
+	probes_info.start.set(start.x, start.y, start.z);
+	probes_info.end.set(end.x, end.y, end.z);
+	probes_info.dim.set(dim.x, dim.y, dim.z);
+
+	//compute the vector from one corner to the other
+	vec3 delta = (probes_info.end - probes_info.start);
+	//compute delta from one probe to the next one
+	delta.x /= (probes_info.dim.x - 1);
+	delta.y /= (probes_info.dim.y - 1);
+	delta.z /= (probes_info.dim.z - 1);
+	probes_info.delta = delta; //store
+
+	probes.clear();
+
+	//lets compute the centers
+	//pay attention at the order at which we add them
+	for (int z = 0; z < probes_info.dim.z; ++z)
+		for (int y = 0; y < probes_info.dim.y; ++y)
+			for (int x = 0; x < probes_info.dim.x; ++x)
+			{
+				sProbe p;
+				p.local.set(x, y, z);
+
+				//index in the linear array
+				p.index = x + y * probes_info.dim.x + z *
+					probes_info.dim.x * probes_info.dim.y;
+
+				//and its position
+				p.pos = probes_info.start +
+					probes_info.delta * Vector3f(x, y, z);
+				probes.push_back(p);
+			}
+}
+
+void SCN::Renderer::initProbesReflection(vec3 start, vec3 end, vec3 dim)
+{
+	//Probes
+	//define bounding of the grid and num probes
+	reflection_probes_info.start.set(start.x, start.y, start.z);
+	reflection_probes_info.end.set(end.x, end.y, end.z);
+	reflection_probes_info.dim.set(dim.x, dim.y, dim.z);
+
+	//compute the vector from one corner to the other
+	vec3 delta = (reflection_probes_info.end - reflection_probes_info.start);
+	//compute delta from one probe to the next one
+	delta.x /= (reflection_probes_info.dim.x - 1);
+	delta.y /= (reflection_probes_info.dim.y - 1);
+	delta.z /= (reflection_probes_info.dim.z - 1);
+	reflection_probes_info.delta = delta; //store
+
+	reflection_probes.clear();
+
+	//lets compute the centers
+	//pay attention at the order at which we add them
+	for (int z = 0; z < reflection_probes_info.dim.z; ++z)
+		for (int y = 0; y < reflection_probes_info.dim.y; ++y)
+			for (int x = 0; x < reflection_probes_info.dim.x; ++x)
+			{
+				sReflectionProbe p;
+				p.local.set(x, y, z);
+
+				//index in the linear array
+				p.index = x + y * reflection_probes_info.dim.x + z *
+					reflection_probes_info.dim.x * reflection_probes_info.dim.y;
+
+				//and its position
+				p.pos = reflection_probes_info.start +
+					reflection_probes_info.delta * Vector3f(x, y, z);
+				reflection_probes.push_back(p);
+			}
+}
+
 void SCN::Renderer::renderProbe(vec3 pos, float scale, SphericalHarmonics& shs)
 {
 	Camera* camera = Camera::current;
@@ -1479,9 +1619,14 @@ void SCN::Renderer::captureProbe(sProbe& p)
 
 		//render the scene from this point of view
 		irr_fbo->bind();
+		vec3 color = scene->background_color;
+		skybox_cubemap = nullptr;
+		scene->background_color = vec3(0.0);
 		renderSceneForward(scene, &cam);
+		skybox_cubemap = GFX::Texture::Get(std::string(scene->base_folder + "/" + scene->skybox_filename).c_str());
+		scene->background_color = color;
 		irr_fbo->unbind();
-
+		
 		//read the pixels back and store in a FloatImage
 		images[i].fromTexture(irr_fbo->color_textures[0]);
 	}
@@ -1530,13 +1675,14 @@ void SCN::Renderer::captureProbes()
 }
 
 
-void SCN::Renderer::renderReflectionProbe(sReflectionProbe* p, float scale)
+void SCN::Renderer::renderReflectionProbe(sReflectionProbe& p, float scale)
 {
 	Camera* camera = Camera::current;
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
+	glCullFace(GL_BACK); 
 	glEnable(GL_CULL_FACE);
 
 	GFX::Shader* shader = GFX::Shader::Get("reflectionProbe");
@@ -1544,12 +1690,12 @@ void SCN::Renderer::renderReflectionProbe(sReflectionProbe* p, float scale)
 		return;
 	shader->enable();
 
-	GFX::Texture* texture = p->texture ? p->texture : skybox_cubemap;
+	GFX::Texture* texture = p.texture ? p.texture : skybox_cubemap;
 	if(!texture)
 		return;
 
 	Matrix44 m;
-	m.setTranslation(p->pos.x, p->pos.y, p->pos.z);
+	m.setTranslation(p.pos.x, p.pos.y, p.pos.z);
 	m.scale(scale, scale, scale);
 	shader->setUniform("u_model", m);
 	cameraToShader(camera, shader);
@@ -1568,12 +1714,12 @@ void SCN::Renderer::renderReflectionProbes(float scale)
 		renderReflectionProbe(ref, scale);
 }
 
-void SCN::Renderer::captureReflectionProbe(sReflectionProbe* p)
+void SCN::Renderer::captureReflectionProbe(sReflectionProbe& p)
 {
-	if (!p->texture)
+	if (!p.texture)
 	{
-		p->texture = new GFX::Texture();
-		p->texture->createCubemap(128, 128, nullptr, GL_RGB, GL_HALF_FLOAT, true);
+		p.texture = new GFX::Texture();
+		p.texture->createCubemap(128, 128, nullptr, GL_RGB, GL_HALF_FLOAT, true);
 	}
 	if (!reflection_fbo)
 		reflection_fbo = new GFX::FBO();
@@ -1585,14 +1731,14 @@ void SCN::Renderer::captureReflectionProbe(sReflectionProbe* p)
 	for (int i = 0; i < 6; ++i) //for every cubemap face
 	{
 		//compute camera orientation using defined vectors
-		vec3 eye = p->pos;
+		vec3 eye = p.pos;
 		vec3 front = cubemapFaceNormals[i][2];
-		vec3 center = p->pos + front;
+		vec3 center = p.pos + front;
 		vec3 up = cubemapFaceNormals[i][1];
 		cam.lookAt(eye, center, up);
 		cam.enable();
 
-		reflection_fbo->setTexture(p->texture, i);
+		reflection_fbo->setTexture(p.texture, i);
 
 		reflection_fbo->bind();
 		renderSceneForward(scene, &cam);
@@ -1600,12 +1746,12 @@ void SCN::Renderer::captureReflectionProbe(sReflectionProbe* p)
 	}
 	//generate the mipmaps
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	p->texture->generateMipmaps();
+	p.texture->generateMipmaps();
 }
 
 void SCN::Renderer::captureReflectionProbes()
 {
-	for (auto p : reflection_probes)
+	for (auto& p : reflection_probes)
 		captureReflectionProbe(p);
 }
 
@@ -1730,27 +1876,53 @@ void Renderer::showUI()
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNode("Irradiance OPTIONS")) {
-		if (ImGui::Button("Capture Irradiance"))
-		{
-			captureProbes();
-		}
+	if (ImGui::TreeNode("Irradiance OPTIONS (Only for DEFERRED)")) {
 		ImGui::Checkbox("Render Irradiance Probes", &probes_grid);
-		if (ImGui::SliderInt("Irradiance Capture Size", &power_of_two_irradiance, 2, 7)) {
+		// Flag to track changes
+		bool valuesChanged = false;
+
+		// Add drag fields for start, end, and dim vectors
+		valuesChanged |= ImGui::DragFloat3("Start", &start[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+		valuesChanged |= ImGui::DragFloat3("End", &end[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+		valuesChanged |= ImGui::DragFloat3("Dim", &dim[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+
+		// If any value changed, call initProbes
+		if (valuesChanged) {
+			initProbes(start, end, dim);
+		}
+		ImGui::DragFloat("Factor", &irradiance_factor, 0.01f, 0.001, 1.5, "%.3f");
+		ImGui::SliderInt("Probe \nSize", &probe_size, 1, 7);
+
+		if (ImGui::SliderInt("Irradiance \nCapture \nResolution", &power_of_two_irradiance, 2, 10)) {
 			// Calculate the actual shadowmap size as a power of two
 			irradiance_capture_size = (1 << power_of_two_irradiance);
 		}
 		// Display the actual shadowmap size
-		ImGui::Text("Actual Irradiance Capture Size: %d", irradiance_capture_size);
+		ImGui::Text("Actual Irradiance Capture Resolution: %d", irradiance_capture_size);
+		ImGui::Checkbox("Capture Irradiance", &enableIrradianceCapture);
+		ImGui::Checkbox("Apply Irradiance", &apply_irradiance);
+		ImGui::Checkbox("Interpolate", &interpolate);
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNode("Reflection OPTIONS")) {
-		if (ImGui::Button("Capture Reflection"))
-		{
-			captureReflectionProbes();
-		}
 		ImGui::Checkbox("Render Reflection Probes", &reflection_probes_grid);
+		// Flag to track changes
+		bool valuesChanged2 = false;
+
+		// Add drag fields for start, end, and dim vectors
+		valuesChanged2 |= ImGui::DragFloat3("Start", &start_reflect[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+		valuesChanged2 |= ImGui::DragFloat3("End", &end_reflect[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+		valuesChanged2 |= ImGui::DragFloat3("Dim", &dim_reflect[0], 0.1f, -FLT_MAX, FLT_MAX, "%.3f");
+
+		// If any value changed, call initProbes
+		if (valuesChanged2) {
+			initProbesReflection(start_reflect, end_reflect, dim_reflect);
+		}
+		//ImGui::DragFloat("Factor", &irradiance_factor, 0.01f, 0.001, 1.5, "%.3f");
+		ImGui::SliderInt("Probe \nSize", &probe_size_reflect, 1, 7);
+		ImGui::Checkbox("Capture Reflections", &enableReflectionCapture);
+		ImGui::Checkbox("Apply Reflection", &apply_reflection);
 		ImGui::TreePop();
 	}
 	if (ImGui::TreeNode("Volumetric Fog OPTIONS")) {

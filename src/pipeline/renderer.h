@@ -59,6 +59,8 @@ struct sIrradianceInfo {
 
 struct sReflectionProbe {
 	vec3 pos;
+	vec3 local; //its ijk pos in the matrix
+	int index; //its index in the linear array
 	GFX::Texture* texture = nullptr;
 };
 
@@ -106,8 +108,14 @@ namespace SCN {
 		bool volumetric_light;
 		bool decal;
 		bool deactivate_motion_blur;
+		bool enableReflectionCapture;
+		bool enableIrradianceCapture;
+		bool apply_irradiance;
+		bool interpolate;
+		bool apply_reflection;
 
 		float ssao_max_distance;
+		float irradiance_factor;
 
 		int shadow_map_index;
 		int shadow_map_size;
@@ -146,6 +154,17 @@ namespace SCN {
 		std::vector<LightEntity*> point_and_spot_lights; //////////
 		LightEntity* moon_light; ////////
 		std::vector<DecalEntity*> decals;
+
+		//a place to store info about the layout of the grid
+		sIrradianceInfo probes_info;
+		sIrradianceInfo reflection_probes_info;
+
+		std::vector<sReflectionProbe> reflection_probes;
+
+		std::vector<sProbe> probes;
+
+		GFX::Texture* probes_texture = nullptr;
+		GFX::FBO* planar_reflection_fbo = nullptr;
 
 		//SSAO
 		float ssao_radius;
@@ -196,11 +215,14 @@ namespace SCN {
 		void captureProbe(sProbe& p);
 		void captureProbes();
 
-		void renderReflectionProbe(sReflectionProbe* p, float scale);
+		void renderReflectionProbe(sReflectionProbe& p, float scale);
 		void renderReflectionProbes(float scale);
-		void captureReflectionProbe(sReflectionProbe* p);
+		void captureReflectionProbe(sReflectionProbe& p);
 		void captureReflectionProbes();
 		void capturePlanarReflection(Camera* camera);
+		void initProbes(vec3 start, vec3 end, vec3 dim);
+		void initProbesReflection(vec3 start, vec3 end, vec3 dim);
+
 
 		void showUI();
 

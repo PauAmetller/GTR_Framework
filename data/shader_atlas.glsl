@@ -14,6 +14,7 @@ tone_mapper quad.vs tonemapper.fs
 probe basic.vs probe.fs
 reflectionProbe basic.vs reflectionProbe.fs
 irradiance quad.vs irradiance.fs
+irradiance_interpol quad.vs irradiance_interpol.fs
 planar basic.vs planar.fs
 //fog only moon_light
 volumetric quad.vs volumetric.fs
@@ -623,6 +624,113 @@ void main()
 	FragColor = vec4(ao, ao, ao, 1.0); 
 }
 
+\irradiance_interpol.fs
+
+#version 330 core
+
+in vec3 v_position;
+in vec2 v_uv;
+
+uniform sampler2D u_color_texture;
+uniform sampler2D u_normal_texture;
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_extra_texture;
+uniform sampler2D u_probes_texture;
+
+uniform mat4 u_inverse_viewprojection;
+uniform mat4 u_viewprojection;
+uniform vec2 u_iRes;
+
+uniform vec3 u_irr_start;
+uniform vec3 u_irr_end;
+uniform vec3 u_irr_dims;
+uniform float u_irr_normal_distance;
+uniform float u_irr_delta;
+uniform int u_num_probes;
+uniform float u_factor;
+out vec4 FragColor;
+
+#include "probes"
+
+vec3 fetchSH(vec3 indices, vec3 N)
+{
+	
+	float row = indices.x + indices.y * u_irr_dims.x + indices.z * u_irr_dims.x * u_irr_dims.y;
+	float row_uv = (row + 1.0) / (u_num_probes + 1.0);
+	SH9Color sh;
+	const float d_uvx = 1.0 / 9.0;
+    for (int i = 0; i < 9; ++i)
+    {
+        vec2 coeffs_uv = vec2((float(i) + 0.5) * d_uvx, row_uv);
+        sh.c[i] = texture(u_probes_texture, coeffs_uv).xyz;
+    }
+    return ComputeSHIrradiance(N, sh);
+}
+
+void main()
+{
+	vec2 uv = gl_FragCoord.xy *u_iRes.xy;
+	vec4 color = texture( u_color_texture, uv);
+	vec3 N = texture( u_normal_texture, uv ).xyz * 2.0 - vec3(1.0);
+	float depth = texture( u_depth_texture, uv).x;
+
+	if(depth == 1.0)
+		discard;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);	
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
+	N = normalize(N);	
+
+	//computing nearest probe index based on world position
+	vec3 irr_range = u_irr_end - u_irr_start;
+	vec3 irr_local_pos = clamp( worldpos - u_irr_start + N * u_irr_normal_distance, vec3(0.0), irr_range );
+
+	//convert from world pos to grid pos
+	vec3 irr_norm_pos = irr_local_pos / u_irr_delta;
+
+	//round values as we cannot fetch between rows for now
+	vec3 local_indices = floor( irr_norm_pos );
+
+	//now we have the interpolation factors
+	vec3 factors = irr_norm_pos - local_indices; 
+
+	// Compute indices for the 8 surrounding probes
+   	vec3 indicesLBF = local_indices; // Left-Bottom-Far
+    vec3 indicesRBF = local_indices; indicesRBF.x += 1.0; // Right-Bottom-Far
+    vec3 indicesLTF = local_indices; indicesLTF.y += 1.0; // Left-Top-Far
+    vec3 indicesRTF = local_indices; indicesRTF.x += 1.0; indicesRTF.y += 1.0; // Right-Top-Far
+    vec3 indicesLBN = local_indices; indicesLBN.z += 1.0; // Left-Bottom-Near
+    vec3 indicesRBN = local_indices; indicesRBN.x += 1.0; indicesRBN.z += 1.0; // Right-Bottom-Near
+    vec3 indicesLTN = local_indices; indicesLTN.y += 1.0; indicesLTN.z += 1.0; // Left-Top-Near
+    vec3 indicesRTN = local_indices; indicesRTN.x += 1.0; indicesRTN.y += 1.0; indicesRTN.z += 1.0; // Right-Top-Near
+
+    // Compute irradiance for every corner
+    vec3 irrLBF = fetchSH(indicesLBF, N);
+    vec3 irrRBF = fetchSH(indicesRBF, N);
+    vec3 irrLTF = fetchSH(indicesLTF, N);
+    vec3 irrRTF = fetchSH(indicesRTF, N);
+    vec3 irrLBN = fetchSH(indicesLBN, N);
+    vec3 irrRBN = fetchSH(indicesRBN, N);
+    vec3 irrLTN = fetchSH(indicesLTN, N);
+    vec3 irrRTN = fetchSH(indicesRTN, N);
+
+	vec3 irrTF = mix( irrLTF, irrRTF, factors.x );
+	//vec3 irrTF = mix( irrLTF, irrRTF, 0.5 );
+	vec3 irrBF = mix( irrLBF, irrRBF, factors.x );
+	vec3 irrTN = mix( irrLTN, irrRTN, factors.x );
+	vec3 irrBN = mix( irrLBN, irrRBN, factors.x );
+
+	vec3 irrT = mix( irrTF, irrTN, factors.z );
+	vec3 irrB = mix( irrBF, irrBN, factors.z );
+
+	vec3 irradiance = mix( irrB, irrT, factors.y );
+    irradiance *= u_factor;
+
+	FragColor = vec4(max(irrTF, vec3(0.0)), 1.0);
+
+}
+
 \irradiance.fs
 
 #version 330 core
@@ -646,6 +754,7 @@ uniform vec3 u_irr_dims;
 uniform float u_irr_normal_distance;
 uniform float u_irr_delta;
 uniform int u_num_probes;
+uniform float u_factor;
 out vec4 FragColor;
 
 #include "probes"
@@ -664,8 +773,6 @@ void main()
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
 	N = normalize(N);	
-
-	vec3 final_color = vec3(0.0);
 
 	//computing nearest probe index based on world position
 	vec3 irr_range = u_irr_end - u_irr_start;
@@ -686,7 +793,6 @@ void main()
 	float row_uv = (row + 1.0) / (u_num_probes + 1.0);
 
 	SH9Color sh;
-
 	//fill the coefficients
 	const float d_uvx = 1.0 / 9.0;
 	for(int i = 0; i < 9; ++i)
@@ -697,8 +803,12 @@ void main()
 
 	//now we can use the coefficients to compute the irradiance
 	vec3 irradiance = ComputeSHIrradiance( N, sh );
-	
-	FragColor = vec4(irradiance, 1.0);
+
+
+    irradiance *= u_factor;
+
+	FragColor = vec4(max(irradiance, vec3(0.0)), 1.0);
+
 }
 
 \deferred_global.fs
@@ -1083,7 +1193,8 @@ void main()
 	for(int i = 0; i < 10; ++i)
 		color += texture(u_texture, mix(uv, prev.xy, i/9.0));
 	color /= 9.0;
-	FragColor = color;
+	//FragColor = color;
+	FragColor = vec4(1.0);
 }
 
 
